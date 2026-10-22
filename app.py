@@ -9,6 +9,8 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
+from PIL import Image, ImageEnhance, ImageFilter
+from bs4 import BeautifulSoup
 
 # ============================================================
 # NXMINI AI CONFIGURATION
@@ -160,7 +162,7 @@ def new_chat():
 
 def get_client():
     if not API_KEY:
-        st.error("Error: OPENROUTER_API_KEY not found in .env file.")
+        st.error("Error: OPENROUTER_API_KEY not found in environment variables or .env file.")
         st.stop()
     return OpenAI(
         api_key=API_KEY,
@@ -170,7 +172,7 @@ def get_client():
     )
 
 # ============================================================
-# IMAGE GENERATION
+# IMAGE GENERATION & EDITING MODULE
 # ============================================================
 
 def generate_ai_image(user_prompt, width=1024, height=1024):
@@ -195,6 +197,26 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
     except Exception:
         return None
 
+def edit_uploaded_image(image_bytes, operation="Grayscale", value=1.5):
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        
+        if operation == "Grayscale":
+            img = img.convert("L")
+        elif operation == "Blur":
+            img = img.filter(ImageFilter.GaussianBlur(radius=value))
+        elif operation == "Enhance Contrast":
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(value)
+        elif operation == "Sharpen":
+            img = img.filter(ImageFilter.SHARPEN)
+            
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return None
+
 # ============================================================
 # LIVE WEATHER FUNCTION (WHOLE WORLD)
 # ============================================================
@@ -209,7 +231,7 @@ def get_world_weather(location):
         geo_url = "https://geocoding-api.open-meteo.com/v1/search"
         geo_res = requests.get(geo_url, params={"name": location, "count": 1}, timeout=10).json()
         if not geo_res.get("results"):
-            return f"❌ **{location}** location not found anywhere worldwide. Please check spelling."
+            return f"❌ **{location}** location not found worldwide. Please check your spelling."
         
         place = geo_res["results"][0]
         lat, lon = place["latitude"], place["longitude"]
@@ -247,11 +269,10 @@ def read_attachment(upload):
         encoded = base64.b64encode(raw).decode("utf-8")
         return {"kind": "image", "name": filename, "image_url": f"data:image/{ext};base64,{encoded}"}
     
-    return {"kind": "error", "name": filename, "content": f"Unsupported file: {filename}"}
+    return {"kind": "error", "name": filename, "content": f"Unsupported file format: {filename}"}
 
 def search_web(query):
     try:
-        from bs4 import BeautifulSoup
         res = requests.get("https://html.duckduckgo.com/html/", params={"q": query}, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
         results = []
@@ -298,7 +319,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown("### AI Modes")
-    st.session_state.mode = st.selectbox("Select Mode", ["General", "Coding", "Math", "Study", "Writing"])
+    st.session_state.mode = st.selectbox("Select Mode", ["General", "Coding", "Math", "Study", "Writing"], key="sidebar_mode_select")
 
     st.divider()
     st.markdown("### Chat History")
@@ -327,7 +348,7 @@ if not messages:
     st.markdown("""
     <div class="nx-welcome">
         <h1>How can I help you today?</h1>
-        <p>Ask anything worldwide, search live web data, record voice notes, or generate images.</p>
+        <p>Ask anything worldwide, search live web data, record voice notes, or generate/edit images.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -335,25 +356,25 @@ for item in messages:
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
         if item.get("type") == "image":
-            st.image(item["content"], caption="Nxmini AI Generated Image")
+            st.image(item["content"], caption="Nxmini AI Image Output")
         else:
             st.markdown(item["content"])
 
 # ============================================================
-# EXPANDABLE TOOLPANELS (Image Gen, Files, Web Search, Voice Input)
+# EXPANDABLE TOOLPANELS (Make Image, Edit Image, Voice, Files, Web Search)
 # ============================================================
 
-with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
-    img_prompt = st.text_input("Describe the image you want...", key="img_prompt_input", placeholder="e.g., A futuristic city skyline at sunset...")
+with st.expander("🎨 Make Image (AI Generator)", expanded=False):
+    img_prompt = st.text_input("Describe the image you want...", key="img_prompt_input", placeholder="e.g., A futuristic cyberpunk city at night...")
     col1, col2 = st.columns(2)
     with col1:
-        w = st.selectbox("Width", [512, 768, 1024], index=2)
+        w = st.selectbox("Width", [512, 768, 1024], index=2, key="img_width_select")
     with col2:
-        h = st.selectbox("Height", [512, 768, 1024], index=2)
+        h = st.selectbox("Height", [512, 768, 1024], index=2, key="img_height_select")
     
-    if st.button("🖼️ Generate Image", use_container_width=True):
+    if st.button("🖼️ Generate Image", use_container_width=True, key="gen_img_btn"):
         if img_prompt.strip():
-            with st.spinner("Nxmini AI is painting..."):
+            with st.spinner("Nxmini AI is painting your image..."):
                 img_data = generate_ai_image(img_prompt.strip(), w, h)
                 if img_data:
                     chat["messages"].append({"role": "user", "content": f"🖼️ *Image Prompt:* {img_prompt}"})
@@ -362,14 +383,34 @@ with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
                 else:
                     st.error("Failed to generate image. Please try another prompt.")
 
+with st.expander("🛠️ Edit Image & Filters", expanded=False):
+    edit_upload = st.file_uploader("Upload an image to modify...", type=["png", "jpg", "jpeg", "webp"], key="image_editor_upload")
+    if edit_upload:
+        st.image(edit_upload, caption="Original Upload", width=300)
+        edit_op = st.selectbox("Select Filter / Transformation", ["Grayscale", "Blur", "Enhance Contrast", "Sharpen"], key="edit_op_select")
+        
+        val = 1.5
+        if edit_op in ["Blur", "Enhance Contrast"]:
+            val = st.slider("Adjustment Level", 0.1, 5.0, 1.5, key="edit_slider")
+            
+        if st.button("Apply Image Edit", use_container_width=True, key="apply_edit_btn"):
+            with st.spinner("Transforming image..."):
+                edited_bytes = edit_uploaded_image(edit_upload.getvalue(), edit_op, val)
+                if edited_bytes:
+                    chat["messages"].append({"role": "user", "content": f"🛠️ *Applied Filter:* {edit_op}"})
+                    chat["messages"].append({"role": "assistant", "content": edited_bytes, "type": "image"})
+                    st.image(edited_bytes, caption=f"Edited Image ({edit_op})")
+                    st.success("Image edited successfully!")
+                else:
+                    st.error("Failed to process image editing.")
+
 with st.expander("🎙️ Realtime Voice Input (Microphone)", expanded=False):
     st.markdown("Record your voice command directly from your browser microphone:")
-    audio_val = st.audio_input("Record voice instruction")
+    audio_val = st.audio_input("Record voice instruction", key="voice_input_widget")
     if audio_val:
         st.audio(audio_val)
-        if st.button("Process Voice Audio", use_container_width=True):
-            with st.spinner("Processing audio context..."):
-                # Simulating voice interpretation prompt wrapper
+        if st.button("Process Voice Audio", use_container_width=True, key="process_voice_btn"):
+            with st.spinner("Processing audio instructions..."):
                 voice_note_text = "[Voice Audio Input Recorded - Please analyze and respond]"
                 chat["messages"].append({"role": "user", "content": voice_note_text})
                 if chat["title"] == "New Chat":
@@ -380,11 +421,16 @@ with st.expander("🎙️ Realtime Voice Input (Microphone)", expanded=False):
                 st.rerun()
 
 with st.expander("📎 Attach Files & Images for Analysis", expanded=False):
-    uploads = st.file_uploader("Upload text files or images...", type=["txt", "py", "html", "css", "js", "md", "png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
+    uploads = st.file_uploader(
+        "Upload text files or images...",
+        type=["txt", "py", "html", "css", "js", "md", "png", "jpg", "jpeg", "webp"],
+        accept_multiple_files=True,
+        key="file_uploader_widget"
+    )
 
 with st.expander("🌐 Real-time World Wide Web Search", expanded=False):
-    s_query = st.text_input("Search query...", key="s_query_input", placeholder="e.g., Latest world news or sports updates")
-    if st.button("Search Live Web") and s_query.strip():
+    s_query = st.text_input("Search query...", key="s_query_input", placeholder="e.g., Latest global tech news or football results")
+    if st.button("Search Live Web", key="live_web_btn") and s_query.strip():
         with st.spinner("Browsing global web results..."):
             results = search_web(s_query.strip())
             st.session_state.web_results = results
@@ -403,7 +449,7 @@ if user_input and user_input.strip():
     images = []
     file_notes = []
 
-    if uploads:
+    if 'uploads' in locals() and uploads:
         for u in uploads:
             att = read_attachment(u)
             if att["kind"] == "text":
@@ -428,7 +474,6 @@ if user_input and user_input.strip():
     with st.chat_message("assistant", avatar="✨"):
         try:
             if is_weather_question(original_prompt):
-                # Clean up query to extract any worldwide city name
                 loc = original_prompt.lower()
                 for w in WEATHER_WORDS:
                     loc = loc.replace(w, "")
@@ -455,7 +500,7 @@ if user_input and user_input.strip():
 
 st.markdown("""
 <div class="nx-footer">
-    Nxmini AI v2.5 (Global & Realtime Enabled) · <strong>Created by Apan2026</strong>
+    Nxmini AI v2.5 (Realtime, Weather, Images & Voice Enabled) · <strong>Created by Apan2026</strong>
 </div>
 """, unsafe_allow_html=True)
 st.caption ("created by Apan2026")
