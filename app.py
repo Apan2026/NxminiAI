@@ -4,6 +4,7 @@ import re
 import base64
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 import streamlit as st
@@ -24,12 +25,12 @@ APP_TAGLINE = "Your AI. Your Universe."
 API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
 
-# লাইভ সময় ও তারিখ স্বয়ংক্রয়ভাবে সিস্টেমে যুক্ত করার জন্য (Real-time Clock Integration)
-current_live_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# বাংলাদেশের সঠিক রিয়েল-টাইম লোকাল টাইম ও তারিখ নিশ্চিত করার জন্য ZoneInfo ব্যবহার করা হয়েছে
+current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M:%S")
 
 SYSTEM_PROMPT = f"""
 You are Nxmini AI, a helpful, multilingual, and advanced AI assistant created by Apan2026.
-Current Live System Time & Date: {current_live_time} (UTC+6 / Bangladesh Standard Time).
+Current Live Bangladesh Standard Time & Date: {current_live_time} (BST / UTC+6).
 Your capabilities include coding, debugging, mathematics, research, detailed writing, reasoning, 
 and providing general knowledge.
 You are designed to offer a full "ChatGPT-like" experience.
@@ -141,7 +142,7 @@ st.markdown("""
 def make_chat():
     return {
         "title": "New Chat",
-        "created": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "created": datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M"),
         "messages": [],
     }
 
