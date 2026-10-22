@@ -1,7 +1,7 @@
 streamlit
+requests
 openai
 python-dotenv
-requests
-ddgs
-pypdf
-python-docx
+beautifulsoup4
+pillow
+
