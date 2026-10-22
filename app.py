@@ -458,4 +458,4 @@ st.markdown("""
     Nxmini AI v2.5 (Global & Realtime Enabled) · <strong>Created by Apan2026</strong>
 </div>
 """, unsafe_allow_html=True)
-st.capterd ("created by Apan2026")
+st.caption ("created by Apan2026")
