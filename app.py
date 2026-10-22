@@ -19,9 +19,7 @@ load_dotenv(override=True)
 APP_NAME = "Nxmini AI"
 APP_TAGLINE = "Your AI. Your Universe."
 
-# .env ফাইল থেকে API key এবং Model ID লোড করা হচ্ছে
 API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
-# আপনি একটি শক্তিশালী মডেল ব্যবহার করতে পারেন, যেমন: 'openai/gpt-4o' বা 'anthropic/claude-3.5-sonnet'
 MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
 
 SYSTEM_PROMPT = """
@@ -43,7 +41,7 @@ st.set_page_config(
 )
 
 # ============================================================
-# STYLING (ChatGPT-like Dark Theme)
+# STYLING (Fixed Textbox & Cursor Color to Black)
 # ============================================================
 
 st.markdown("""
@@ -95,15 +93,27 @@ st.markdown("""
     border: 1px solid #34394d;
     border-radius: 8px;
 }
+
+/* --- Chat Input Box & Cursor Styling (Black Text & Cursor) --- */
 [data-testid="stChatInput"] {
     background: #ffffff !important;
     border: 2px solid #aeb5c5 !important;
     border-radius: 15px !important;
 }
-[data-testid="stChatInput"] textarea {
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] textarea:focus {
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
+    caret-color: #000000 !important;
+    background: #ffffff !important;
+    font-size: 16px !important;
 }
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #555555 !important;
+    -webkit-text-fill-color: #555555 !important;
+    opacity: 1 !important;
+}
+
 .stButton button {
     border-radius: 8px !important;
     border: 1px solid #363c50;
@@ -160,31 +170,21 @@ def get_client():
     )
 
 # ============================================================
-# IMAGE GENERATION (With Quality & Safety Engineering)
+# IMAGE GENERATION
 # ============================================================
 
 def generate_ai_image(user_prompt, width=1024, height=1024):
     try:
-        # --- PROMPT ENGINEERING: Quality & Safety ---
-        # আমরা ব্যবহারকারীর প্রম্পটের সাথে কিছু 'ম্যাজিক ওয়ার্ড' যোগ করছি
-        
-        # ১. ছবির গুণমান বাড়ানোর জন্য (Quality Boosters)
         quality_paddings = (
             "photorealistic, masterpiece, highly detailed, professional lighting, "
             "ultra-high resolution, UHD, 8k, sharp focus, dynamic lighting, cinematic composition"
         )
-        
-        # ২. নিরাপত্তা নিশ্চিত করার জন্য (Safety & Negative Prompting style in instructions)
-        # যদিও Pollinations.ai নিজেই ফিল্টার করে, তবুও আমরা নির্দেশ দিচ্ছি
         safety_instructions = (
             "Avoid any nudity, sexually explicit content, excessive violence, gore, "
             "hate speech, or illegal activities."
         )
-
-        # চূড়ান্ত প্রম্পট তৈরি: মূল প্রম্পট + কোয়ালিটি + নিরাপত্তা
         final_prompt = f"{user_prompt}. {quality_paddings}. STRICT RULE: {safety_instructions}."
         
-        # URL encoding
         encoded_prompt = requests.utils.quote(final_prompt)
         url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&nologo=true"
         
@@ -240,11 +240,9 @@ def read_attachment(upload):
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     raw = upload.getvalue()
     
-    # Text Analysis
     if ext in {"txt", "py", "html", "css", "js", "md", "json", "csv", "sql"}:
         return {"kind": "text", "name": filename, "content": raw.decode("utf-8", errors="replace")[:30000]}
     
-    # Image Vision Analysis (GPT-4 Vision compatible)
     if ext in {"png", "jpg", "jpeg", "webp"}:
         encoded = base64.b64encode(raw).decode("utf-8")
         return {"kind": "image", "name": filename, "image_url": f"data:image/{ext};base64,{encoded}"}
@@ -279,7 +277,6 @@ def get_ai_response(history, images=None):
         if item["role"] == "user" and idx == len(history) - 1 and images:
             parts = [{"type": "text", "text": content}]
             for img in images:
-                # Vision APIs accept image_url parts
                 parts.append({"type": "image_url", "image_url": {"url": img["image_url"]}})
             content = parts
         api_messages.append({"role": item["role"], "content": content})
@@ -334,7 +331,6 @@ if not messages:
     </div>
     """, unsafe_allow_html=True)
 
-# Render Chat History
 for item in messages:
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
@@ -347,7 +343,6 @@ for item in messages:
 # EXPANDABLE TOOLPANELS
 # ============================================================
 
-# 1. Image Generator Panel (Updated)
 with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
     img_prompt = st.text_input("Describe the image you want...", key="img_prompt_input", placeholder="e.g., A futuristic park in Dhaka with flying cars...")
     col1, col2 = st.columns(2)
@@ -361,24 +356,21 @@ with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
             with st.spinner("Nxmini AI is painting (this may take a moment)..."):
                 img_data = generate_ai_image(img_prompt.strip(), w, h)
                 if img_data:
-                    # চ্যাটে ব্যবহারকারী এবং এআই-এর ম্যাসেজ যোগ করা
                     chat["messages"].append({"role": "user", "content": f"🖼️ *Image Prompt:* {img_prompt}"})
                     chat["messages"].append({"role": "assistant", "content": img_data, "type": "image"})
                     st.rerun()
                 else:
                     st.error("Failed to generate image. Please try another prompt.")
 
-# 2. File Attachments Panel
 with st.expander("📎 Attach Files & Images for Analysis", expanded=False):
     uploads = st.file_uploader("Upload text files or images...", type=["txt", "py", "html", "css", "js", "md", "png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
-# 3. Web Search Panel
 with st.expander("🌐 Real-time Web Search", expanded=False):
     s_query = st.text_input("Search query...", key="s_query_input", placeholder="e.g., Bangladesh vs India cricket score")
     if st.button("Search Web") and s_query.strip():
         with st.spinner("Searching..."):
             results = search_web(s_query.strip())
-            st.session_state.web_results = results # পরে এআই-কে দেওয়ার জন্য সেভ করা হলো
+            st.session_state.web_results = results
             st.markdown(f"**Search Results:**\n\n{results}")
 
 # ============================================================
@@ -389,50 +381,40 @@ user_input = st.chat_input("Message Nxmini AI...")
 
 if user_input and user_input.strip():
     original_prompt = user_input.strip()
-    
-    # এআই-কে মোড এবং অতিরিক্ত কনটেক্সট (ফাইল/সার্চ) জানানো
     api_prompt = f"[{st.session_state.mode} Mode] " + original_prompt
 
     images = []
     file_notes = []
 
-    # ফাইল আপলোড প্রসেস করা
     if uploads:
         for u in uploads:
             att = read_attachment(u)
             if att["kind"] == "text":
                 file_notes.append(f"\n--- Attached File: {att['name']} ---\n{att['content']}")
             elif att["kind"] == "image":
-                images.append(att) # GPT-4 Vision-এর জন্য আলাদা রাখা হলো
+                images.append(att)
 
-    # ফাইলের টেক্সট প্রম্পটের সাথে যুক্ত করা
     if file_notes:
         api_prompt += "\n" + "\n".join(file_notes)
 
-    # ওয়েব সার্চের ফলাফল প্রম্পটের সাথে যুক্ত করা
     if st.session_state.web_results:
         api_prompt += "\n\nWeb Search Results:\n" + st.session_state.web_results
-        st.session_state.web_results = "" # ব্যবহার হয়ে যাওয়ার পর ক্লিয়ার করা হলো
+        st.session_state.web_results = ""
 
-    # চ্যাট হিস্ট্রিতে ব্যবহারকারীর প্রম্পট যোগ করা
     chat["messages"].append({"role": "user", "content": original_prompt})
     if chat["title"] == "New Chat":
         chat["title"] = original_prompt[:30]
 
-    # ব্যবহারকারীর ম্যাসেজ চ্যাটে দেখানো
     with st.chat_message("user", avatar="🧑‍💻"):
         st.markdown(original_prompt)
 
-    # এআই-এর ম্যাসেজ প্রসেস করা এবং দেখানো
     with st.chat_message("assistant", avatar="✨"):
         try:
-            # আবহাওয়ার প্রশ্ন কি না চেক করা
             if is_weather_question(original_prompt):
                 loc = original_prompt.replace("weather", "").replace("আবহাওয়া", "").replace("তাপমাত্রা", "").strip() or "Dhaka"
                 ans = get_world_weather(loc)
             else:
                 with st.spinner("Nxmini AI is thinking..."):
-                    # এপিআই-তে পাঠানোর জন্য হিস্ট্রি কপি করে শেষ প্রম্পট পরিবর্তন করা
                     api_history = list(chat["messages"])
                     api_history[-1] = {"role": "user", "content": api_prompt}
                     ans = get_ai_response(api_history, images)
@@ -441,7 +423,6 @@ if user_input and user_input.strip():
             ans = f"Error: {str(exc)}"
             st.error(ans)
 
-    # চ্যাট হিস্ট্রিতে এআই-এর উত্তর যোগ করা
     chat["messages"].append({"role": "assistant", "content": ans})
     st.rerun()
 
