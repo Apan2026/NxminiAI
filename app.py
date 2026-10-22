@@ -10,7 +10,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image, ImageEnhance, ImageFilter
-from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
 
 # ============================================================
 # NXMINI AI CONFIGURATION
@@ -254,7 +254,7 @@ def get_world_weather(location):
         return f"Failed to retrieve global weather data: {str(e)}"
 
 # ============================================================
-# FILE READER & WEB SEARCH
+# FILE READER & REAL-TIME WEB SEARCH
 # ============================================================
 
 def read_attachment(upload):
@@ -273,14 +273,10 @@ def read_attachment(upload):
 
 def search_web(query):
     try:
-        res = requests.get("https://html.duckduckgo.com/html/", params={"q": query}, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        soup = BeautifulSoup(res.text, "html.parser")
         results = []
-        for item in soup.select(".result")[:4]:
-            h = item.select_one(".result__title")
-            s = item.select_one(".result__snippet")
-            if h:
-                results.append(f"Title: {h.get_text(strip=True)}\nSummary: {s.get_text(strip=True) if s else ''}")
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=4):
+                results.append(f"Title: {r.get('title')}\nSummary: {r.get('body')}")
         return "\n\n".join(results) if results else "No live web results found."
     except Exception as exc:
         return "Web Search Error: " + str(exc)[:100]
@@ -503,4 +499,3 @@ st.markdown("""
     Nxmini AI v2.5 (Realtime, Weather, Images & Voice Enabled) · <strong>Created by Apan2026</strong>
 </div>
 """, unsafe_allow_html=True)
-st.caption ("created by Apan2026")
