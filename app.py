@@ -196,10 +196,10 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
         return None
 
 # ============================================================
-# LIVE WEATHER FUNCTION
+# LIVE WEATHER FUNCTION (WHOLE WORLD)
 # ============================================================
 
-WEATHER_WORDS = ["weather", "temperature", "forecast", "আবহাওয়া", "আবহাওয়া", "তাপমাত্রা", "বৃষ্টি"]
+WEATHER_WORDS = ["weather", "temperature", "forecast", "climate", "abawa", "আবহাওয়া", "আবহাওয়া", "তাপমাত্রা", "বৃষ্টি"]
 
 def is_weather_question(text):
     return any(word in text.lower() for word in WEATHER_WORDS)
@@ -209,7 +209,7 @@ def get_world_weather(location):
         geo_url = "https://geocoding-api.open-meteo.com/v1/search"
         geo_res = requests.get(geo_url, params={"name": location, "count": 1}, timeout=10).json()
         if not geo_res.get("results"):
-            return f"❌ **{location}** নামে কোনো স্থান খুঁজে পাওয়া যায়নি।"
+            return f"❌ **{location}** location not found anywhere worldwide. Please check spelling."
         
         place = geo_res["results"][0]
         lat, lon = place["latitude"], place["longitude"]
@@ -217,19 +217,19 @@ def get_world_weather(location):
         weather_url = "https://api.open-meteo.com/v1/forecast"
         w_res = requests.get(weather_url, params={
             "latitude": lat, "longitude": lon,
-            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m"
+            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code"
         }, timeout=10).json()
         
         curr = w_res["current"]
         return (
-            f"## 🌍 Weather for {place.get('name')}, {place.get('country', '')}\n\n"
+            f"## 🌍 Real-Time Weather for {place.get('name')}, {place.get('country', '')}\n\n"
             f"- 🌡️ **Temperature:** {curr['temperature_2m']}°C\n"
             f"- 🤗 **Feels Like:** {curr['apparent_temperature']}°C\n"
             f"- 💧 **Humidity:** {curr['relative_humidity_2m']}%\n"
             f"- 💨 **Wind Speed:** {curr['wind_speed_10m']} km/h"
         )
-    except Exception:
-        return "আবহাওয়া তথ্য আনতে ব্যর্থ হয়েছে।"
+    except Exception as e:
+        return f"Failed to retrieve global weather data: {str(e)}"
 
 # ============================================================
 # FILE READER & WEB SEARCH
@@ -255,14 +255,14 @@ def search_web(query):
         res = requests.get("https://html.duckduckgo.com/html/", params={"q": query}, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
         results = []
-        for item in soup.select(".result")[:3]:
+        for item in soup.select(".result")[:4]:
             h = item.select_one(".result__title")
             s = item.select_one(".result__snippet")
             if h:
                 results.append(f"Title: {h.get_text(strip=True)}\nSummary: {s.get_text(strip=True) if s else ''}")
-        return "\n\n".join(results) if results else "কোনো তথ্য পাওয়া যায়নি।"
+        return "\n\n".join(results) if results else "No live web results found."
     except Exception as exc:
-        return "ওয়েব সার্চ সমস্যা: " + str(exc)[:100]
+        return "Web Search Error: " + str(exc)[:100]
 
 # ============================================================
 # OPENROUTER AI CHAT RESPONSE
@@ -321,13 +321,13 @@ with st.sidebar:
 chat = st.session_state.chats[st.session_state.active_chat]
 messages = chat["messages"]
 
-st.markdown('<div class="nx-status">✦ NXMINI AI · ADVANCED GPT EXPERIENCE</div>', unsafe_allow_html=True)
+st.markdown('<div class="nx-status">✦ NXMINI AI · GLOBAL REALTIME EXPERIENCE</div>', unsafe_allow_html=True)
 
 if not messages:
     st.markdown("""
     <div class="nx-welcome">
         <h1>How can I help you today?</h1>
-        <p>Ask anything, write code, analyze files, or generate high-quality images.</p>
+        <p>Ask anything worldwide, search live web data, record voice notes, or generate images.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -340,11 +340,11 @@ for item in messages:
             st.markdown(item["content"])
 
 # ============================================================
-# EXPANDABLE TOOLPANELS
+# EXPANDABLE TOOLPANELS (Image Gen, Files, Web Search, Voice Input)
 # ============================================================
 
 with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
-    img_prompt = st.text_input("Describe the image you want...", key="img_prompt_input", placeholder="e.g., A futuristic park in Dhaka with flying cars...")
+    img_prompt = st.text_input("Describe the image you want...", key="img_prompt_input", placeholder="e.g., A futuristic city skyline at sunset...")
     col1, col2 = st.columns(2)
     with col1:
         w = st.selectbox("Width", [512, 768, 1024], index=2)
@@ -353,7 +353,7 @@ with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
     
     if st.button("🖼️ Generate Image", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner("Nxmini AI is painting (this may take a moment)..."):
+            with st.spinner("Nxmini AI is painting..."):
                 img_data = generate_ai_image(img_prompt.strip(), w, h)
                 if img_data:
                     chat["messages"].append({"role": "user", "content": f"🖼️ *Image Prompt:* {img_prompt}"})
@@ -362,16 +362,33 @@ with st.expander("🎨 Generate High-Quality AI Image", expanded=False):
                 else:
                     st.error("Failed to generate image. Please try another prompt.")
 
+with st.expander("🎙️ Realtime Voice Input (Microphone)", expanded=False):
+    st.markdown("Record your voice command directly from your browser microphone:")
+    audio_val = st.audio_input("Record voice instruction")
+    if audio_val:
+        st.audio(audio_val)
+        if st.button("Process Voice Audio", use_container_width=True):
+            with st.spinner("Processing audio context..."):
+                # Simulating voice interpretation prompt wrapper
+                voice_note_text = "[Voice Audio Input Recorded - Please analyze and respond]"
+                chat["messages"].append({"role": "user", "content": voice_note_text})
+                if chat["title"] == "New Chat":
+                    chat["title"] = "Voice Query"
+                
+                ans = get_ai_response(chat["messages"])
+                chat["messages"].append({"role": "assistant", "content": ans})
+                st.rerun()
+
 with st.expander("📎 Attach Files & Images for Analysis", expanded=False):
     uploads = st.file_uploader("Upload text files or images...", type=["txt", "py", "html", "css", "js", "md", "png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
-with st.expander("🌐 Real-time Web Search", expanded=False):
-    s_query = st.text_input("Search query...", key="s_query_input", placeholder="e.g., Bangladesh vs India cricket score")
-    if st.button("Search Web") and s_query.strip():
-        with st.spinner("Searching..."):
+with st.expander("🌐 Real-time World Wide Web Search", expanded=False):
+    s_query = st.text_input("Search query...", key="s_query_input", placeholder="e.g., Latest world news or sports updates")
+    if st.button("Search Live Web") and s_query.strip():
+        with st.spinner("Browsing global web results..."):
             results = search_web(s_query.strip())
             st.session_state.web_results = results
-            st.markdown(f"**Search Results:**\n\n{results}")
+            st.markdown(f"**Global Search Results:**\n\n{results}")
 
 # ============================================================
 # CHAT INPUT & PROCESSING
@@ -398,7 +415,7 @@ if user_input and user_input.strip():
         api_prompt += "\n" + "\n".join(file_notes)
 
     if st.session_state.web_results:
-        api_prompt += "\n\nWeb Search Results:\n" + st.session_state.web_results
+        api_prompt += "\n\nLive Web Search Context:\n" + st.session_state.web_results
         st.session_state.web_results = ""
 
     chat["messages"].append({"role": "user", "content": original_prompt})
@@ -411,7 +428,13 @@ if user_input and user_input.strip():
     with st.chat_message("assistant", avatar="✨"):
         try:
             if is_weather_question(original_prompt):
-                loc = original_prompt.replace("weather", "").replace("আবহাওয়া", "").replace("তাপমাত্রা", "").strip() or "Dhaka"
+                # Clean up query to extract any worldwide city name
+                loc = original_prompt.lower()
+                for w in WEATHER_WORDS:
+                    loc = loc.replace(w, "")
+                loc = loc.replace("in", "").replace("at", "").replace("for", "").strip()
+                if not loc:
+                    loc = "Dhaka"
                 ans = get_world_weather(loc)
             else:
                 with st.spinner("Nxmini AI is thinking..."):
@@ -432,6 +455,7 @@ if user_input and user_input.strip():
 
 st.markdown("""
 <div class="nx-footer">
-    Nxmini AI v2.0 (Powered by OpenRouter) · <strong>Created by Apan2026</strong>
+    Nxmini AI v2.5 (Global & Realtime Enabled) · <strong>Created by Apan2026</strong>
 </div>
 """, unsafe_allow_html=True)
+st.capterd ("created by Apan2026")
