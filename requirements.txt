@@ -1,7 +1,8 @@
+
 streamlit
 requests
 openai
 python-dotenv
-beautifulsoup4
+duckduckgo-search
 pillow
 
