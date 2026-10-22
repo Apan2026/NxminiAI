@@ -279,7 +279,7 @@ def read_attachment(upload):
 def search_web(query):
     try:
         results = []
-        with DDGS() as ddgs:
+        with DDGS(headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}) as ddgs:
             for r in ddgs.text(query, max_results=4):
                 results.append(f"Title: {r.get('title')}\nSummary: {r.get('body')}")
         return "\n\n".join(results) if results else "No live web results found."
