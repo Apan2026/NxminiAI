@@ -49,7 +49,7 @@ st.set_page_config(
 )
 
 # ============================================================
-# THEME & STYLING MANAGEMENT (Dark / Light Mode Support)
+# THEME & STYLING MANAGEMENT (Sidebar Fixed White)
 # ============================================================
 
 if "theme" not in st.session_state:
@@ -60,11 +60,12 @@ def get_theme_css(theme):
         return """
 <style>
 .stApp { background: #f0f2f6; color: #1e1e1e; }
-[data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid #dcdcdc; }
+[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #dcdcdc; }
+[data-testid="stSidebar"] * { color: #111111 !important; }
 .nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
 .nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
-.nx-welcome h1 { color: #ffffff; }
+.nx-welcome h1 { color: #111111; }
 [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #111111 !important; }
 [data-testid="stChatMessage"] pre { background: #f7f7f8 !important; border: 1px solid #dcdcdc; border-radius: 8px; }
@@ -77,10 +78,11 @@ def get_theme_css(theme):
         return """
 <style>
 .stApp { background: #0b0d12; color: #f5f6ff; }
-[data-testid="stSidebar"] { background: #11141d; border-right: 1px solid #303547; }
-.nx-title { font-size: 32px; font-weight: 800; color: #ffffff; letter-spacing: -1px; }
-.nx-subtitle { color: #b9c1d5; margin-bottom: 20px; }
-.nx-status { color: #aeb8ff; font-size: 12px; letter-spacing: 1px; }
+[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #303547; }
+[data-testid="stSidebar"] * { color: #111111 !important; }
+.nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
+.nx-subtitle { color: #555555; margin-bottom: 20px; }
+.nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
 .nx-welcome h1 { color: #ffffff; }
 [data-testid="stChatMessage"] { background: #171b27; border: 1px solid #34394d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #f7f8ff !important; }
