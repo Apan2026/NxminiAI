@@ -48,6 +48,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# 🔍 GOOGLE SEARCH CONSOLE VERIFICATION META TAG
+st.markdown(
+    """
+    <head>
+        <meta name="google-site-verification" content="-RaqxtcaQXbC4nMlNvl92hSOrMqYIsucAie3k1exuTo" />
+    </head>
+    """,
+    unsafe_allow_html=True
+)
+
 # ============================================================
 # THEME & STYLING MANAGEMENT (Sidebar Fixed White)
 # ============================================================
