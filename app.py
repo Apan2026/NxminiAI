@@ -64,7 +64,7 @@ def get_theme_css(theme):
 .nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
 .nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
-.nx-welcome h1 { color: #111111; }
+.nx-welcome h1 { color: #ffffff; }
 [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #111111 !important; }
 [data-testid="stChatMessage"] pre { background: #f7f7f8 !important; border: 1px solid #dcdcdc; border-radius: 8px; }
