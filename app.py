@@ -68,4 +68,14 @@ def get_theme_css(theme):
         [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
         [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #111111 !important; }
         [data-testid="stChatMessage"] pre { background: #f7f7f8 !important; border: 1px solid #dcdcdc; border-radius: 8px; }
-        [data-testid="stChatInput"] { background:
+        [data-testid="stChatInput"] { background: #ffffff !important; border: 2px solid #b0b8c4 !important; border-radius: 15px !important; }
+        [data-testid="stChatInput"] textarea { color: #000000 !important; background: #ffffff !important; font-size: 16px !important; }
+        .nx-footer { text-align: center; color: #666666; padding: 24px 0 8px; font-size: 13px; }
+        </style>
+        """
+    else:
+        return """
+        <style>
+        .stApp { background: #0b0d12; color: #f5f6ff; }
+        [data-testid="stSidebar"] { background: #11141d; border-right: 1px solid #303547; }
+        
