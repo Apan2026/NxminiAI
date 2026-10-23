@@ -1,58 +1,30 @@
-# NxminiAI
+# ✦ Nxmini AI v3.0
 
-A lightweight Streamlit AI assistant built with OpenRouter.
+An enterprise-grade, multi-modal AI assistant application built with Python and Streamlit. Designed for productivity, research, coding, image processing, and real-time updates.
 
-## Features
-- Multilingual chat (English + Bengali)
-- Weather lookup using Open-Meteo
-- File and image attachments
-- Web search panel
-- Voice input support
-- Chat history with modes
+🚀 *Live Demo:* [Nxmini AI Live App](https://nxminiai.streamlit.app)
 
-## Requirements
-- Python 3.10+
-- OpenRouter API key
+---
 
-## Setup
+## ✨ Features
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Apan2026/NxminiAI.git
-   cd NxminiAI
-   ```
+- 💬 *Advanced Chat Interface:* Powered by OpenRouter with custom system prompts and BST (Bangladesh Standard Time) awareness.
+- 🌐 *Live Web Search:* Integrated DuckDuckGo web search capability.
+- 🌍 *Real-Time Weather:* World weather forecasts powered by Open-Meteo.
+- 🖼️ *AI Image Generation & Editing:* Text-to-image generation via Pollinations AI and custom image filter tools.
+- 🎙️ *Voice & File Analysis:* Support for processing audio notes and inspecting standard code/text files.
+- 🎨 *Custom Theme Switcher:* Fully responsive Dark and Light modes with a streamlined sidebar interface.
 
-2. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
+---
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🛠️ Built With
 
-4. Create your environment file:
-   ```bash
-   cp .env.example .env
-   ```
+- *Python*
+- *Streamlit*
+- *OpenAI / OpenRouter API*
+- *DuckDuckGo Search*
+- *Pillow (PIL)*
 
-5. Add your OpenRouter key in `.env`:
-   ```env
-   OPENROUTER_API_KEY=your_key_here
-   OPENROUTER_MODEL=openrouter/free
-   ```
+---
 
-6. Run the app:
-   ```bash
-   streamlit run app.py
-   ```
-
-## Main file
-- `app.py`
-
-## Notes
-- The app uses OpenRouter for LLM access.
-- Weather data comes from Open-Meteo.
-- Voice recognition uses Google Speech Recognition if available.
+👨‍💻 *Developed by:* [Apan2026](https://github.com/Apan2026)
