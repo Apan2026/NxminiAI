@@ -146,7 +146,7 @@ def get_theme_css(theme):
 [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #111111 !important; }
 .nx-footer { text-align: center; color: #666666; padding: 24px 0 8px; font-size: 13px; }
-.ad-banner { background: #e3f2fd; border: 1px dashed #1e88e5; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; color: #0d47a1; margin-bottom: 15px; }
+.ad-banner { background: #e3f2fd; border: 1px dashed #1e88e5; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; color: #0d47a1; margin-bottom: 15px; }
 </style>
 """
     else:
@@ -162,7 +162,7 @@ def get_theme_css(theme):
 [data-testid="stChatMessage"] { background: #171b27; border: 1px solid #34394d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #f7f8ff !important; }
 .nx-footer { text-align: center; color: #aab1c5; padding: 24px 0 8px; font-size: 13px; }
-.ad-banner { background: #1e2638; border: 1px dashed #4db6ac; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; color: #80cbc4; margin-bottom: 15px; }
+.ad-banner { background: #1e2638; border: 1px dashed #4db6ac; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; color: #80cbc4; margin-bottom: 15px; }
 </style>
 """
 
@@ -210,7 +210,6 @@ def get_client():
         timeout=90.0,
     )
 
-# Text To Speech Generator
 def text_to_speech(text):
     try:
         clean_text = re.sub(r'<[^>]+>', '', text)
@@ -222,7 +221,6 @@ def text_to_speech(text):
     except Exception:
         return None
 
-# Python Code Runner Sandbox
 def execute_python_code(code_str):
     buffer = io.StringIO()
     import sys
@@ -237,7 +235,6 @@ def execute_python_code(code_str):
         sys.stdout = sys.__stdout__
         return f"Execution Error: {str(e)}"
 
-# Features: Weather, Search, Image
 WEATHER_WORDS = ["weather", "temperature", "forecast", "abawa", "আবহাওয়া", "আবহাওয়া", "তাপমাত্রা"]
 
 def is_weather_question(text):
@@ -314,14 +311,12 @@ with st.sidebar:
 
     st.markdown("### 🛠️ Advanced Tools")
     
-    # Python Code Runner Tool
     with st.expander("🐍 Python Code Runner"):
         code_input = st.text_area("Write Python Code:", "print('Hello Nxmini AI!')", height=100)
         if st.button("Run Code", use_container_width=True):
             out = execute_python_code(code_input)
             st.code(out, language="text")
 
-    # Voice Input
     with st.expander("🎙️ Voice Command"):
         tool_audio = st.audio_input("Record Voice Note", key="sidebar_audio_in")
         if tool_audio and st.button("Process Voice", use_container_width=True):
@@ -333,7 +328,6 @@ with st.sidebar:
             db_save_message(st.session_state.active_chat, "assistant", ans)
             st.rerun()
 
-    # Image Generator
     with st.expander("🖼️ AI Image Generator"):
         gen_box_prompt = st.text_input("Describe image...", key="sidebar_img_gen")
         if st.button("Generate Image", use_container_width=True):
@@ -369,7 +363,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# 6. MAIN INTERFACE & MONETIZATION BANNER
+# 6. MAIN INTERFACE & WORKING UPGRADE BANNER
 # ============================================================
 
 chat = active_chat_data
@@ -377,11 +371,11 @@ messages = chat["messages"]
 
 st.markdown('<div class="nx-status">✦ NXMINI AI · ENTERPRISE SUITE V3.0</div>', unsafe_allow_html=True)
 
-# Monetization & Offer Banner
+# Functional Upgrade / Payment Link Banner
 st.markdown("""
 <div class="ad-banner">
-    💎 <strong>Nxmini AI Pro Option Available!</strong> Unlock local bKash/Nagad auto-payments & Premium AI Models. 
-    <a href="#" style="color:#00e676; text-decoration:none; font-weight:bold;">Upgrade Now</a>
+    💎 <strong>Nxmini AI Pro Option Available!</strong> Unlock local bKash/Nagad auto-payments & Premium AI Models.<br>
+    <a href="https://wa.me/8801700000000?text=I%20want%20to%20upgrade%20Nxmini%20AI%20Pro" target="_blank" style="color:#00e676; text-decoration:none; font-weight:bold; font-size:15px;">👉 Click Here to Upgrade via bKash / WhatsApp</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -393,7 +387,6 @@ if not messages:
     </div>
     """, unsafe_allow_html=True)
 
-# Render Chat History
 for idx, item in enumerate(messages):
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
@@ -401,8 +394,6 @@ for idx, item in enumerate(messages):
             st.image(item["content"], caption="Nxmini AI Output")
         else:
             st.markdown(item["content"])
-            
-            # Text To Speech Audio Player Button for AI Messages
             if item["role"] == "assistant" and isinstance(item["content"], str):
                 if st.button(f"🔊 Listen Response", key=f"tts_{idx}"):
                     audio_fp = text_to_speech(item["content"])
@@ -425,7 +416,6 @@ if user_input and user_input.strip():
             web_context = search_web(search_term)
             api_prompt += f"\n\nLive Web Search Results:\n{web_context}"
 
-    # Save User Msg
     chat["messages"].append({"role": "user", "content": original_prompt})
     db_save_message(st.session_state.active_chat, "user", original_prompt)
 
@@ -459,7 +449,6 @@ if user_input and user_input.strip():
             latency = 0.0
             st.error(ans)
 
-    # Save Assistant Msg
     chat["messages"].append({"role": "assistant", "content": ans, "latency": latency})
     db_save_message(st.session_state.active_chat, "assistant", ans, latency=latency)
     st.rerun()
