@@ -4,3 +4,5 @@ openai
 Pillow
 duckduckgo_search
 gtts
+python-dotenv
+
