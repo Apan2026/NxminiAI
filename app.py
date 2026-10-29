@@ -245,18 +245,30 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
     except Exception:
         return None
 
-def edit_uploaded_image(image_bytes, operation="Grayscale", value=1.5):
+def edit_uploaded_image(image_bytes, instruction=""):
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        if operation == "Grayscale":
-            img = img.convert("L")
-        elif operation == "Blur":
-            img = img.filter(ImageFilter.GaussianBlur(radius=value))
-        elif operation == "Enhance Contrast":
+        inst = instruction.lower()
+        
+        if "bright" in inst:
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(1.5)
+        elif "dark" in inst:
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(0.7)
+        elif "contrast" in inst:
             enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(value)
-        elif operation == "Sharpen":
+            img = enhancer.enhance(1.8)
+        elif "sharp" in inst:
             img = img.filter(ImageFilter.SHARPEN)
+        elif "blur" in inst:
+            img = img.filter(ImageFilter.GaussianBlur(radius=2))
+        elif "gray" in inst or "black & white" in inst or "b&w" in inst:
+            img = img.convert("L")
+        else:
+            enhancer = ImageEnhance.Color(img)
+            img = enhancer.enhance(1.2)
+            
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
@@ -393,13 +405,14 @@ with st.sidebar:
                         active_chat_data["messages"].append({"role": "assistant", "content": img_bytes, "type": "image"})
                         st.rerun()
 
-    with st.expander("🛠️ Image Filter Editor"):
+    with st.expander("🛠️ Custom Image Editor"):
         edit_file_up = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="sidebar_edit_up")
-        edit_op = st.selectbox("Select Filter", ["Grayscale", "Blur", "Enhance Contrast", "Sharpen"], key="sidebar_edit_op")
-        if edit_file_up and st.button("Apply Filter", use_container_width=True, key="sidebar_edit_btn"):
-            edited_bytes = edit_uploaded_image(edit_file_up.getvalue(), edit_op)
+        edit_instruction = st.text_input("How to edit?", placeholder="e.g., make it brighter, blur, or b&w", key="sidebar_edit_instruction")
+        
+        if edit_file_up and st.button("Apply Edit", use_container_width=True, key="sidebar_edit_btn"):
+            edited_bytes = edit_uploaded_image(edit_file_up.getvalue(), edit_instruction)
             if edited_bytes:
-                active_chat_data["messages"].append({"role": "user", "content": f"Apply Filter: {edit_op}"})
+                active_chat_data["messages"].append({"role": "user", "content": f"Edit Image Instruction: {edit_instruction}"})
                 active_chat_data["messages"].append({"role": "assistant", "content": edited_bytes, "type": "image"})
                 st.rerun()
 
