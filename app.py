@@ -29,7 +29,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT,
-            is_premium INTEGER DEFAULT 0
+            is_premium INTEGER DEFAULT 0,
+            free_msgs_left INTEGER DEFAULT 3
         )
     ''')
     c.execute('''
@@ -59,7 +60,7 @@ def db_register_user(username, password):
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        c.execute("INSERT INTO users (username, password, is_premium) VALUES (?, ?, 0)", (username, password))
+        c.execute("INSERT INTO users (username, password, is_premium, free_msgs_left) VALUES (?, ?, 0, 3)", (username, password))
         conn.commit()
         conn.close()
         return True
@@ -69,7 +70,7 @@ def db_register_user(username, password):
 def db_check_user(username, password):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT is_premium FROM users WHERE username=? AND password=?", (username, password))
+    c.execute("SELECT is_premium, free_msgs_left FROM users WHERE username=? AND password=?", (username, password))
     res = c.fetchone()
     conn.close()
     return res
@@ -78,6 +79,21 @@ def db_upgrade_user_to_premium(username):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("UPDATE users SET is_premium=1 WHERE username=?", (username,))
+    conn.commit()
+    conn.close()
+
+def db_get_user_info(username):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT is_premium, free_msgs_left FROM users WHERE username=?", (username,))
+    res = c.fetchone()
+    conn.close()
+    return res
+
+def db_decrement_free_msg(username):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE users SET free_msgs_left = free_msgs_left - 1 WHERE username=? AND free_msgs_left > 0", (username,))
     conn.commit()
     conn.close()
 
@@ -136,9 +152,9 @@ MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
 current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M:%S")
 
 SYSTEM_PROMPT = f"""
-You are Nxmini AI, a helpful, multilingual, and advanced AI assistant created by Apan2026.
+You are Nxmini AI, an advanced, multilingual AI assistant created by Apan2026.
 Current Live Bangladesh Standard Time & Date: {current_live_time} (BST / UTC+6).
-Always answer in the user's language clearly and step-by-step. Use Markdown and code blocks.
+Always answer clearly, step-by-step, using Markdown and code blocks.
 """
 
 st.set_page_config(
@@ -156,11 +172,12 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.session_state.is_premium = 0
+    st.session_state.free_msgs_left = 3
     st.session_state.is_admin = False
 
 if not st.session_state.logged_in:
     st.title("🔐 Nxmini AI - Login / Register")
-    st.write("অ্যাপটি ব্যবহার করতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
+    st.write("স্মার্ট এআই অভিজ্ঞতা পেতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
 
     tab1, tab2 = st.tabs(["Login", "Register (New Account)"])
 
@@ -173,6 +190,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = l_user
                 st.session_state.is_premium = res[0]
+                st.session_state.free_msgs_left = res[1]
                 st.success("লগইন সফল হয়েছে!")
                 st.rerun()
             else:
@@ -184,12 +202,18 @@ if not st.session_state.logged_in:
         if st.button("Create Account"):
             if r_user and r_pass:
                 if db_register_user(r_user, r_pass):
-                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে লগইন করুন।")
+                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে প্রবেশ করুন (আপনার জন্য ৩টি ফ্রি মেসেজ রয়েছে)।")
                 else:
                     st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
             else:
                 st.warning("সব ফিল্ড পূরণ করুন।")
     st.stop()
+
+# Refresh user status from DB
+u_info = db_get_user_info(st.session_state.username)
+if u_info:
+    st.session_state.is_premium = u_info[0]
+    st.session_state.free_msgs_left = u_info[1]
 
 # ============================================================
 # 4. THEME & STYLING
@@ -210,6 +234,8 @@ def get_theme_css(theme):
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
 [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 .pay-box { background: #fff3e0; border: 2px solid #ffa726; padding: 15px; border-radius: 10px; color: #e65100; margin-bottom: 15px; }
+.badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+.badge-free { background: #e0e0e0; color: #333; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 </style>
 """
     else:
@@ -223,6 +249,8 @@ def get_theme_css(theme):
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
 [data-testid="stChatMessage"] { background: #171b27; border: 1px solid #34394d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 .pay-box { background: #1e1b18; border: 2px solid #ff9800; padding: 15px; border-radius: 10px; color: #ffb74d; margin-bottom: 15px; }
+.badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+.badge-free { background: #333333; color: #fff; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 </style>
 """
 
@@ -308,8 +336,14 @@ active_chat_data = st.session_state.chats.get(st.session_state.active_chat, {"ti
 
 with st.sidebar:
     st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
-    st.write(f"👤 User: **{st.session_state.username}**")
     
+    # Status Badge Display
+    if st.session_state.is_premium == 1:
+        st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-pro">👑 PRO VIP</span>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-free">🔒 FREE TRIAL</span>', unsafe_allow_html=True)
+        st.caption(f"🎁 ফ্রি মেসেজ বাকি আছে: {st.session_state.free_msgs_left}টি")
+
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.is_admin = False
@@ -340,12 +374,12 @@ with st.sidebar:
     # IF ADMIN IS LOGGED IN, SHOW FRIEND'S ACCOUNT UNLOCK PANEL
     if st.session_state.is_admin:
         st.markdown("### 👑 Admin Panel (Cash Unlock)")
-        st.success("আপনি অ্যাডমিন হিসেবে আছেন।")
+        st.success("অ্যাডমিন প্যানেল সক্রিয়।")
         friend_username = st.text_input("Friend's Username to Unlock")
         if st.button("Unlock Friend's Pro"):
             if friend_username.strip():
                 db_upgrade_user_to_premium(friend_username.strip())
-                st.success(f"'{friend_username}' এর অ্যাকাউন্ট সফলভাবে প্রিমিয়াম করা হয়েছে!")
+                st.success(f"'{friend_username}' এর একাউন্ট সফলভাবে প্রিমিয়াম করা হয়েছে!")
             else:
                 st.warning("বন্ধুর ইউজারনেম লিখুন।")
 
@@ -353,22 +387,22 @@ with st.sidebar:
 
     # REGULAR PREMIUM / bKash & Nagad PAYMENT STATUS
     if st.session_state.is_premium == 0:
-        st.markdown("### 🔒 Pro Features Locked")
-        st.info("ফুল ফিচার পেতে ৫০ টাকা বিকাশ/নগদ পেমেন্ট করুন অথবা অ্যাডমিনের থেকে ক্যাশ দিয়ে আনলক করিয়ে নিন।")
+        st.markdown("### 🔒 Unlock Pro (50 BDT)")
+        st.info("সব ফিচার আজই আনলক করুন মাত্র ৫০ টাকায়!")
         
         with st.expander("💎 bKash / Nagad Payment"):
             st.markdown("""
             **বিকাশ / নগদ পার্সোনাল নম্বর:**  
-            `01700000000` (Send Money)  
+            `01711197695` (Send Money)  
             
-            পেমেন্ট করে ট্রানজেকশন আইডি (TrxID) দিন:
+            ৫০ টাকা সেন্ড করে TrxID দিন:
             """)
             trx_input = st.text_input("Enter TrxID")
             if st.button("Verify Payment"):
                 if trx_input.strip():
                     db_upgrade_user_to_premium(st.session_state.username)
                     st.session_state.is_premium = 1
-                    st.success("প্রিমিয়াম আনলক হয়েছে!")
+                    st.success("অভিনন্দন! প্রিমিয়াম সফলভাবে আনলক হয়েছে!")
                     st.rerun()
     else:
         st.markdown("### 🛠️ Pro Advanced Tools")
@@ -396,12 +430,12 @@ with st.sidebar:
 # 7. MAIN INTERFACE
 # ============================================================
 
-st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE SUITE</div>', unsafe_allow_html=True)
+st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE ENTERPRISE SUITE</div>', unsafe_allow_html=True)
 
 if st.session_state.is_premium == 0:
-    st.markdown("""
+    st.markdown(f"""
     <div class="pay-box">
-        ⚠️ <strong>ফ্রি ভার্সন!</strong> ফুল ফিচার পেতে সাইডবার থেকে ৫০ টাকা বিকাশ বা নগদ পেমেন্ট করুন, অথবা ক্যাশ টাকা দিয়ে অ্যাডমিনের থেকে একাউন্ট আনলক করে নিন।
+        ⚠️ <strong>ফ্রি ট্রায়াল চলছে!</strong> আপনার কাছে আর মাত্র <strong>{st.session_state.free_msgs_left}টি ফ্রি মেসেজ</strong> বাকি আছে। আনলিমিটেড অ্যাক্সেস পেতে মাত্র ৫০ টাকা বিকাশ বা নগদ পেমেন্ট করুন (নম্বর: <strong>01711197695</strong>) অথবা ক্যাশ দিয়ে অ্যাডমিনের থেকে একাউন্ট আনলক করুন।
     </div>
     """, unsafe_allow_html=True)
 
@@ -427,23 +461,30 @@ for idx, item in enumerate(messages):
 user_input = st.chat_input("Message Nxmini AI...")
 
 if user_input and user_input.strip():
-    original_prompt = user_input.strip()
-    
-    chat["messages"].append({"role": "user", "content": original_prompt})
-    db_save_message(st.session_state.active_chat, "user", original_prompt)
+    # Check if free user has exceeded limit
+    if st.session_state.is_premium == 0 and st.session_state.free_msgs_left <= 0:
+        st.error("❌ আপনার ফ্রি মেসেজের লিমিট শেষ! ফুল ফিচার ব্যবহার করতে ৫০ টাকা পেমেন্ট করে একাউন্ট প্রিমিয়াম করুন অথবা অ্যাডমিনের সাথে যোগাযোগ করুন।")
+    else:
+        original_prompt = user_input.strip()
+        
+        chat["messages"].append({"role": "user", "content": original_prompt})
+        db_save_message(st.session_state.active_chat, "user", original_prompt)
 
-    if chat["title"] == "New Chat":
-        chat["title"] = original_prompt[:30]
-        db_save_chat(st.session_state.active_chat, st.session_state.username, chat["title"], chat["created"])
+        if st.session_state.is_premium == 0:
+            db_decrement_free_msg(st.session_state.username)
 
-    with st.chat_message("user", avatar="🧑‍💻"):
-        st.markdown(original_prompt)
+        if chat["title"] == "New Chat":
+            chat["title"] = original_prompt[:30]
+            db_save_chat(st.session_state.active_chat, st.session_state.username, chat["title"], chat["created"])
 
-    with st.chat_message("assistant", avatar="✨"):
-        with st.spinner("Nxmini AI is thinking..."):
-            ans = get_ai_response(chat["messages"])
-            st.markdown(ans)
+        with st.chat_message("user", avatar="🧑‍💻"):
+            st.markdown(original_prompt)
 
-    chat["messages"].append({"role": "assistant", "content": ans})
-    db_save_message(st.session_state.active_chat, "assistant", ans)
-    st.rerun()
+        with st.chat_message("assistant", avatar="✨"):
+            with st.spinner("Nxmini AI is thinking..."):
+                ans = get_ai_response(chat["messages"])
+                st.markdown(ans)
+
+        chat["messages"].append({"role": "assistant", "content": ans})
+        db_save_message(st.session_state.active_chat, "assistant", ans)
+        st.rerun()
