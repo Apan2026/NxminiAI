@@ -211,7 +211,7 @@ if not st.session_state.logged_in:
                 else:
                     st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
             else:
-                st.warning("সব ফিল্ড পূরণ করুন।")
+                st.warning("সব ফিল্ড পূরণ করুন።")
     st.stop()
 
 u_info = db_get_user_info(st.session_state.username)
@@ -303,7 +303,12 @@ def get_client():
 def text_to_speech(text):
     try:
         clean_text = re.sub(r'<[^>]+>', '', text)
-        tts = gTTS(text=clean_text[:500], lang='bn')
+        # Auto-detect language: if Bengali characters are more, use 'bn', otherwise 'en'
+        bn_chars = len(re.findall(r'[\u0980-\u09FF]', clean_text))
+        en_chars = len(re.findall(r'[a-zA-Z]', clean_text))
+        lang = 'bn' if bn_chars > en_chars else 'en'
+        
+        tts = gTTS(text=clean_text[:500], lang=lang)
         fp = io.BytesIO()
         tts.write_to_fp(fp)
         fp.seek(0)
