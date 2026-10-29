@@ -223,24 +223,26 @@ if u_info:
     st.session_state.free_msgs_left = u_info[1]
 
 # ============================================================
-# 4. THEME & STYLING
+# 4. THEME & STYLING (PURE BLACK TEXT FOR LIGHT MODE)
 # ============================================================
 
 if "theme" not in st.session_state:
-    st.session_state.theme = "Dark"
+    st.session_state.theme = "Light"
 
 def get_theme_css(theme):
     if theme == "Light":
         return """
 <style>
-.stApp { background: #f0f2f6; color: #1e1e1e; }
-[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #dcdcdc; }
-[data-testid="stSidebar"] * { color: #111111 !important; }
-.nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
+.stApp { background: #ffffff; color: #000000 !important; }
+[data-testid="stSidebar"] { background: #f8f9fa !important; border-right: 1px solid #dcdcdc; }
+[data-testid="stSidebar"] * { color: #000000 !important; }
+p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #000000 !important; }
+.nx-title { font-size: 32px; font-weight: 800; color: #000000 !important; letter-spacing: -1px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
-[data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+[data-testid="stChatMessage"] { background: #f1f3f5; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; color: #000000 !important; }
+[data-testid="stChatMessage"] p { color: #000000 !important; }
 .badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
-.badge-free { background: #e0e0e0; color: #333; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+.badge-free { background: #e0e0e0; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 </style>
 """
     else:
@@ -403,7 +405,7 @@ with st.sidebar:
 
     st.divider()
 
-    # PAYMENT SECTION (ONLY SHOWN IF USER IS NOT PREMIUM AND NOT ADMIN)
+    # PAYMENT SECTION
     if st.session_state.is_premium == 0 and not st.session_state.is_admin:
         with st.expander("💎 Unlock Pro (50 BDT)"):
             st.markdown("""
@@ -454,7 +456,6 @@ with st.sidebar:
 
 st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE ENTERPRISE SUITE</div>', unsafe_allow_html=True)
 
-# File Attachment Option (Only for Pro / Admin Users)
 uploaded_file = None
 attached_text = ""
 if st.session_state.is_premium == 1 or st.session_state.is_admin:
@@ -494,7 +495,6 @@ if user_input and user_input.strip():
     else:
         full_query = user_input.strip()
         
-        # Web Search Integration
         if "search" in full_query.lower() or "find" in full_query.lower() or "news" in full_query.lower():
             with st.spinner("Searching the web..."):
                 search_data = web_search(full_query)
