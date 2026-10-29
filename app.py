@@ -154,7 +154,7 @@ current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%
 SYSTEM_PROMPT = f"""
 You are Nxmini AI, an advanced, multilingual AI assistant created by Apan2026.
 Current Live Bangladesh Standard Time & Date: {current_live_time} (BST / UTC+6).
-Always answer clearly, step-by-step, using Markdown and code blocks.
+You specialize in study help, assignment writing, web research, and explaining complex topics clearly step-by-step in Markdown.
 """
 
 st.set_page_config(
@@ -177,7 +177,7 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state.logged_in:
     st.title("🔐 Nxmini AI - Login / Register")
-    st.write("স্মার্ট এআই অভিজ্ঞতা পেতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
+    st.write("স্মার্ট এআই ও স্টাডি অ্যাসিস্ট্যান্ট ব্যবহার করতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
 
     tab1, tab2 = st.tabs(["Login", "Register (New Account)"])
 
@@ -192,10 +192,8 @@ if not st.session_state.logged_in:
                 st.session_state.is_premium = res[0]
                 st.session_state.free_msgs_left = res[1]
                 
-                # Auto check if admin username
                 if l_user.lower() in ["apan", "admin"]:
                     st.session_state.is_admin = True
-                    db_upgrade_user_to_premium(l_user)
                     st.session_state.is_premium = 1
 
                 st.success("লগইন সফল হয়েছে!")
@@ -209,14 +207,13 @@ if not st.session_state.logged_in:
         if st.button("Create Account"):
             if r_user and r_pass:
                 if db_register_user(r_user, r_pass):
-                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে প্রবেশ করুন (আপনার জন্য ৩টি ফ্রি মেসেজ রয়েছে)।")
+                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে প্রবেশ করুন (৩টি ফ্রি মেসেজ সহ)।")
                 else:
                     st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
             else:
                 st.warning("সব ফিল্ড পূরণ করুন।")
     st.stop()
 
-# Refresh user status from DB
 u_info = db_get_user_info(st.session_state.username)
 if u_info:
     if st.session_state.is_admin:
@@ -240,10 +237,8 @@ def get_theme_css(theme):
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #dcdcdc; }
 [data-testid="stSidebar"] * { color: #111111 !important; }
 .nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
-.nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
 [data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
-.pay-box { background: #fff3e0; border: 2px solid #ffa726; padding: 15px; border-radius: 10px; color: #e65100; margin-bottom: 15px; }
 .badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 .badge-free { background: #e0e0e0; color: #333; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 </style>
@@ -255,10 +250,8 @@ def get_theme_css(theme):
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #303547; }
 [data-testid="stSidebar"] * { color: #111111 !important; }
 .nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
-.nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
 [data-testid="stChatMessage"] { background: #171b27; border: 1px solid #34394d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
-.pay-box { background: #1e1b18; border: 2px solid #ff9800; padding: 15px; border-radius: 10px; color: #ffb74d; margin-bottom: 15px; }
 .badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 .badge-free { background: #333333; color: #fff; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
 </style>
@@ -267,7 +260,7 @@ def get_theme_css(theme):
 st.markdown(get_theme_css(st.session_state.theme), unsafe_allow_html=True)
 
 # ============================================================
-# 5. STATE MANAGEMENT & FUNCTIONS
+# 5. STATE MANAGEMENT & HELPER FUNCTIONS
 # ============================================================
 
 db_chats = db_load_chats(st.session_state.username)
@@ -316,6 +309,24 @@ def text_to_speech(text):
     except Exception:
         return None
 
+def web_search(query):
+    try:
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=3):
+                results.append(f"Title: {r.get('title')}\nSnippet: {r.get('body')}\nURL: {r.get('href')}")
+        return "\n\n".join(results) if results else "No relevant web results found."
+    except Exception as e:
+        return f"Web search error: {str(e)}"
+
+def generate_pollinations_image(prompt):
+    try:
+        encoded_prompt = requests.utils.quote(prompt)
+        image_url = f"https://pollinations.ai/p/{encoded_prompt}"
+        return image_url
+    except Exception:
+        return None
+
 def execute_python_code(code_str):
     buffer = io.StringIO()
     import sys
@@ -339,7 +350,7 @@ def get_ai_response(history):
     return response.choices[0].message.content if response.choices else ""
 
 # ============================================================
-# 6. SIDEBAR & ADMIN DASHBOARD LOGIC
+# 6. SIDEBAR & ADMIN DASHBOARD
 # ============================================================
 
 active_chat_data = st.session_state.chats.get(st.session_state.active_chat, {"title": "New Chat", "messages": []})
@@ -347,12 +358,11 @@ active_chat_data = st.session_state.chats.get(st.session_state.active_chat, {"ti
 with st.sidebar:
     st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
     
-    # Status Badge Display
     if st.session_state.is_premium == 1 or st.session_state.is_admin:
         st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-pro">👑 PRO VIP</span>', unsafe_allow_html=True)
     else:
         st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-free">🔒 FREE TRIAL</span>', unsafe_allow_html=True)
-        st.caption(f"🎁 ফ্রি মেসেজ বাকি আছে: {st.session_state.free_msgs_left}টি")
+        st.caption(f"🎁 ফ্রি মেসেজ বাকি: {st.session_state.free_msgs_left}টি")
 
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
@@ -367,7 +377,7 @@ with st.sidebar:
 
     st.divider()
 
-    # ADMIN SECRET CODE VERIFICATION & DASHBOARD
+    # ADMIN SECRET CODE
     if not st.session_state.is_admin:
         with st.expander("🔑 Admin Login / Secret Code"):
             code_input = st.text_input("Enter Admin Code", type="password")
@@ -376,48 +386,50 @@ with st.sidebar:
                     st.session_state.is_admin = True
                     db_upgrade_user_to_premium(st.session_state.username)
                     st.session_state.is_premium = 1
-                    st.success("Admin Mode Activated!")
+                    st.success("Admin Activated!")
                     st.rerun()
                 else:
                     st.error("ভুল সিক্রেট কোড!")
 
-    # IF ADMIN IS LOGGED IN, SHOW FRIEND'S ACCOUNT UNLOCK PANEL & PRO TOOLS
     if st.session_state.is_admin:
         st.markdown("### 👑 Admin Panel (Cash Unlock)")
-        st.success("অ্যাডমিন প্যানেল সক্রিয়।")
         friend_username = st.text_input("Friend's Username to Unlock")
         if st.button("Unlock Friend's Pro"):
             if friend_username.strip():
                 db_upgrade_user_to_premium(friend_username.strip())
-                st.success(f"'{friend_username}' এর একাউন্ট সফলভাবে প্রিমিয়াম করা হয়েছে!")
+                st.success(f"'{friend_username}' এর একাউন্ট প্রিমিয়াম করা হয়েছে!")
             else:
-                st.warning("বন্ধুর ইউজারনেম লিখুন।")
+                st.warning("ইউজারনেম লিখুন।")
 
     st.divider()
 
-    # REGULAR PREMIUM / bKash & Nagad PAYMENT STATUS OR PRO TOOLS
+    # PAYMENT SECTION (ONLY SHOWN IF USER IS NOT PREMIUM AND NOT ADMIN)
     if st.session_state.is_premium == 0 and not st.session_state.is_admin:
-        st.markdown("### 🔒 Unlock Pro (50 BDT)")
-        st.info("সব ফিচার আজই আনলক করুন মাত্র ৫০ টাকায়!")
-        
-        with st.expander("💎 bKash / Nagad Payment"):
+        with st.expander("💎 Unlock Pro (50 BDT)"):
             st.markdown("""
             **বিকাশ / নগদ পার্সোনাল নম্বর:**  
             `01711197695` (Send Money)  
             
-            ৫০ টাকা সেন্ড করে TrxID দিন:
+            ৫০ টাকা পাঠিয়ে TrxID দিন:
             """)
             trx_input = st.text_input("Enter TrxID")
             if st.button("Verify Payment"):
                 if trx_input.strip():
                     db_upgrade_user_to_premium(st.session_state.username)
                     st.session_state.is_premium = 1
-                    st.success("অভিনন্দন! প্রিমিয়াম সফলভাবে আনলক হয়েছে!")
+                    st.success("প্রিমিয়াম আনলক হয়েছে!")
                     st.rerun()
     else:
-        st.markdown("### 🛠️ Pro Advanced Tools")
+        st.markdown("### 🛠️ Pro Exclusive Tools")
+        with st.expander("🎨 AI Image Generator"):
+            img_prompt = st.text_input("Image Description:", "A futuristic sci-fi city in Bangladesh")
+            if st.button("Generate Image"):
+                img_url = generate_pollinations_image(img_prompt)
+                if img_url:
+                    st.image(img_url, caption=img_prompt)
+        
         with st.expander("🐍 Python Code Runner"):
-            code_input = st.text_area("Python Code:", "print('Pro Unlocked!')", height=80)
+            code_input = st.text_area("Python Code:", "print('Pro Tools Unlocked!')", height=80)
             if st.button("Run Code"):
                 st.code(execute_python_code(code_input))
 
@@ -442,12 +454,18 @@ with st.sidebar:
 
 st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE ENTERPRISE SUITE</div>', unsafe_allow_html=True)
 
-if st.session_state.is_premium == 0 and not st.session_state.is_admin:
-    st.markdown(f"""
-    <div class="pay-box">
-        ⚠️ <strong>ফ্রি ট্রায়াল চলছে!</strong> আপনার কাছে আর মাত্র <strong>{st.session_state.free_msgs_left}টি ফ্রি মেসেজ</strong> বাকি আছে। আনলিমিটেড অ্যাক্সেস পেতে মাত্র ৫০ টাকা বিকাশ বা নগদ পেমেন্ট করুন (নম্বর: <strong>01711197695</strong>) অথবা ক্যাশ দিয়ে অ্যাডমিনের থেকে একাউন্ট আনলক করুন।
-    </div>
-    """, unsafe_allow_html=True)
+# File Attachment Option (Only for Pro / Admin Users)
+uploaded_file = None
+attached_text = ""
+if st.session_state.is_premium == 1 or st.session_state.is_admin:
+    uploaded_file = st.file_uploader("📎 Attach Document or Image (Pro Exclusive):", type=["png", "jpg", "jpeg", "txt", "pdf"])
+    if uploaded_file is not None:
+        if uploaded_file.type.startswith("image"):
+            img = Image.open(uploaded_file)
+            st.image(img, caption="Attached Image", width=250)
+            attached_text = "[User attached an image]"
+        else:
+            attached_text = str(uploaded_file.read().decode("utf-8", errors="ignore"))
 
 chat = active_chat_data
 messages = chat.get("messages", [])
@@ -463,7 +481,7 @@ for idx, item in enumerate(messages):
     with st.chat_message(item["role"], avatar=avatar):
         st.markdown(item["content"])
         if item["role"] == "assistant" and (st.session_state.is_premium == 1 or st.session_state.is_admin):
-            if st.button(f"🔊 Listen", key=f"tts_{idx}"):
+            if st.button(f"🔊 Listen (Voice)", key=f"tts_{idx}"):
                 audio_fp = text_to_speech(item["content"])
                 if audio_fp:
                     st.audio(audio_fp, format="audio/mp3")
@@ -471,28 +489,36 @@ for idx, item in enumerate(messages):
 user_input = st.chat_input("Message Nxmini AI...")
 
 if user_input and user_input.strip():
-    # Check if free user has exceeded limit
     if st.session_state.is_premium == 0 and not st.session_state.is_admin and st.session_state.free_msgs_left <= 0:
-        st.error("❌ আপনার ফ্রি মেসেজের লিমিট শেষ! ফুল ফিচার ব্যবহার করতে ৫০ টাকা পেমেন্ট করে একাউন্ট প্রিমিয়াম করুন অথবা অ্যাডমিনের সাথে যোগাযোগ করুন।")
+        st.error("❌ ফ্রি মেসেজ শেষ! ফুল অ্যাক্সেস পেতে সাইডবারের 'Unlock Pro' অপশন থেকে পেমেন্ট করুন।")
     else:
-        original_prompt = user_input.strip()
+        full_query = user_input.strip()
         
-        chat["messages"].append({"role": "user", "content": original_prompt})
-        db_save_message(st.session_state.active_chat, "user", original_prompt)
+        # Web Search Integration
+        if "search" in full_query.lower() or "find" in full_query.lower() or "news" in full_query.lower():
+            with st.spinner("Searching the web..."):
+                search_data = web_search(full_query)
+                full_query = f"{full_query}\n\nWeb Search Results:\n{search_data}"
+
+        if uploaded_file is not None and attached_text and (st.session_state.is_premium == 1 or st.session_state.is_admin):
+            full_query = f"{full_query}\n\nAttached Context:\n{attached_text[:2000]}"
+
+        chat["messages"].append({"role": "user", "content": user_input.strip()})
+        db_save_message(st.session_state.active_chat, "user", user_input.strip())
 
         if st.session_state.is_premium == 0 and not st.session_state.is_admin:
             db_decrement_free_msg(st.session_state.username)
 
         if chat["title"] == "New Chat":
-            chat["title"] = original_prompt[:30]
+            chat["title"] = user_input.strip()[:30]
             db_save_chat(st.session_state.active_chat, st.session_state.username, chat["title"], chat["created"])
 
         with st.chat_message("user", avatar="🧑‍💻"):
-            st.markdown(original_prompt)
+            st.markdown(user_input.strip())
 
         with st.chat_message("assistant", avatar="✨"):
-            with st.spinner("Nxmini AI is thinking..."):
-                ans = get_ai_response(chat["messages"])
+            with st.spinner("Nxmini AI is analyzing..."):
+                ans = get_ai_response([{"role": "user", "content": full_query}])
                 st.markdown(ans)
 
         chat["messages"].append({"role": "assistant", "content": ans})
