@@ -17,30 +17,14 @@ from duckduckgo_search import DDGS
 from gtts import gTTS
 
 # ============================================================
-# 1. DATABASE MANAGEMENT
+# 1. DATABASE MANAGEMENT (SQLite for Persistent Chat)
 # ============================================================
 
-DB_FILE = "nxmini_enterprise.db"
+DB_FILE = "nxmini_chats.db"
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT,
-            is_premium INTEGER DEFAULT 0,
-            free_msgs_left INTEGER DEFAULT 3
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS chats (
-            chat_id TEXT PRIMARY KEY,
-            username TEXT,
-            title TEXT,
-            created TEXT
-        )
-    ''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +32,15 @@ def init_db():
             role TEXT,
             content TEXT,
             msg_type TEXT,
-            latency REAL
+            latency REAL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chats (
+            chat_id TEXT PRIMARY KEY,
+            title TEXT,
+            created TEXT
         )
     ''')
     conn.commit()
@@ -56,51 +48,10 @@ def init_db():
 
 init_db()
 
-def db_register_user(username, password):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, password, is_premium, free_msgs_left) VALUES (?, ?, 0, 3)", (username, password))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception:
-        return False
-
-def db_check_user(username, password):
+def db_save_chat(chat_id, title, created):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT is_premium, free_msgs_left FROM users WHERE username=? AND password=?", (username, password))
-    res = c.fetchone()
-    conn.close()
-    return res
-
-def db_upgrade_user_to_premium(username):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET is_premium=1 WHERE username=?", (username,))
-    conn.commit()
-    conn.close()
-
-def db_get_user_info(username):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT is_premium, free_msgs_left FROM users WHERE username=?", (username,))
-    res = c.fetchone()
-    conn.close()
-    return res
-
-def db_decrement_free_msg(username):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE users SET free_msgs_left = free_msgs_left - 1 WHERE username=? AND free_msgs_left > 0", (username,))
-    conn.commit()
-    conn.close()
-
-def db_save_chat(chat_id, username, title, created):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO chats (chat_id, username, title, created) VALUES (?, ?, ?, ?)", (chat_id, username, title, created))
+    c.execute("INSERT OR REPLACE INTO chats (chat_id, title, created) VALUES (?, ?, ?)", (chat_id, title, created))
     conn.commit()
     conn.close()
 
@@ -112,10 +63,10 @@ def db_save_message(chat_id, role, content, msg_type="text", latency=0.0):
     conn.commit()
     conn.close()
 
-def db_load_chats(username):
+def db_load_chats():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT chat_id, title, created FROM chats WHERE username=? ORDER BY created DESC", (username,))
+    c.execute("SELECT chat_id, title, created FROM chats ORDER BY created DESC")
     rows = c.fetchall()
     chats = {}
     for r in rows:
@@ -152,9 +103,10 @@ MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
 current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M:%S")
 
 SYSTEM_PROMPT = f"""
-You are Nxmini AI, an advanced, multilingual AI assistant created by Apan2026.
+You are Nxmini AI, a helpful, multilingual, and advanced AI assistant created by Apan2026.
 Current Live Bangladesh Standard Time & Date: {current_live_time} (BST / UTC+6).
-You specialize in study help, assignment writing, web research, and explaining complex topics clearly step-by-step in Markdown.
+You offer a full enterprise-grade experience with Python code execution, Audio processing, Image analysis/generation, and Web search.
+Always answer in the user's language clearly and step-by-step. Use Markdown and code blocks.
 """
 
 st.set_page_config(
@@ -164,85 +116,37 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ============================================================
-# 3. AUTHENTICATION & LOGIN STATE
-# ============================================================
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.username = ""
-    st.session_state.is_premium = 0
-    st.session_state.free_msgs_left = 3
-    st.session_state.is_admin = False
-
-if not st.session_state.logged_in:
-    st.title("🔐 Nxmini AI - Login / Register")
-    st.write("স্মার্ট এআই ও স্টাডি অ্যাসিস্ট্যান্ট ব্যবহার করতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
-
-    tab1, tab2 = st.tabs(["Login", "Register (New Account)"])
-
-    with tab1:
-        l_user = st.text_input("Username", key="l_user")
-        l_pass = st.text_input("Password", type="password", key="l_pass")
-        if st.button("Login Now", type="primary"):
-            res = db_check_user(l_user, l_pass)
-            if res is not None:
-                st.session_state.logged_in = True
-                st.session_state.username = l_user
-                st.session_state.is_premium = res[0]
-                st.session_state.free_msgs_left = res[1]
-                
-                if l_user.lower() in ["apan", "admin"]:
-                    st.session_state.is_admin = True
-                    st.session_state.is_premium = 1
-
-                st.success("লগইন সফল হয়েছে!")
-                st.rerun()
-            else:
-                st.error("ভুল ইউজারনেম অথবা পাসওয়ার্ড!")
-
-    with tab2:
-        r_user = st.text_input("Choose Username", key="r_user")
-        r_pass = st.text_input("Choose Password", type="password", key="r_pass")
-        if st.button("Create Account"):
-            if r_user and r_pass:
-                if db_register_user(r_user, r_pass):
-                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে প্রবেশ করুন (৩টি ফ্রি মেসেজ সহ)।")
-                else:
-                    st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
-            else:
-                st.warning("সব ফিল্ড পূরণ করুন।")
-    st.stop()
-
-u_info = db_get_user_info(st.session_state.username)
-if u_info:
-    if st.session_state.is_admin:
-        st.session_state.is_premium = 1
-    else:
-        st.session_state.is_premium = u_info[0]
-    st.session_state.free_msgs_left = u_info[1]
+st.markdown(
+    """
+    <head>
+        <meta name="google-site-verification" content="-RaqxtcaQXbC4nMlNvl92hSOrMqYIsucAie3k1exuTo" />
+    </head>
+    """,
+    unsafe_allow_html=True
+)
 
 # ============================================================
-# 4. THEME & STYLING (PURE BLACK TEXT FOR LIGHT MODE)
+# 3. THEME MANAGEMENT
 # ============================================================
 
 if "theme" not in st.session_state:
-    st.session_state.theme = "Light"
+    st.session_state.theme = "Dark"
 
 def get_theme_css(theme):
     if theme == "Light":
         return """
 <style>
-.stApp { background: #ffffff; color: #000000 !important; }
-[data-testid="stSidebar"] { background: #f8f9fa !important; border-right: 1px solid #dcdcdc; }
-[data-testid="stSidebar"] * { color: #000000 !important; }
-p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #000000 !important; }
-.nx-title { font-size: 32px; font-weight: 800; color: #000000 !important; letter-spacing: -1px; }
+.stApp { background: #f0f2f6; color: #1e1e1e; }
+[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #dcdcdc; }
+[data-testid="stSidebar"] * { color: #111111 !important; }
+.nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
+.nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
-[data-testid="stChatMessage"] { background: #f1f3f5; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; color: #000000 !important; }
-[data-testid="stChatMessage"] p { color: #000000 !important; }
-.badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
-.badge-free { background: #e0e0e0; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+.nx-welcome h1 { color: #111111; }
+[data-testid="stChatMessage"] { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+[data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #111111 !important; }
+.nx-footer { text-align: center; color: #666666; padding: 24px 0 8px; font-size: 13px; }
+.ad-banner { background: #e3f2fd; border: 1px dashed #1e88e5; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; color: #0d47a1; margin-bottom: 15px; }
 </style>
 """
     else:
@@ -252,20 +156,23 @@ p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #000000 !important; }
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #303547; }
 [data-testid="stSidebar"] * { color: #111111 !important; }
 .nx-title { font-size: 32px; font-weight: 800; color: #111111; letter-spacing: -1px; }
+.nx-subtitle { color: #555555; margin-bottom: 20px; }
 .nx-status { color: #0044cc; font-size: 12px; letter-spacing: 1px; }
+.nx-welcome h1 { color: #ffffff; }
 [data-testid="stChatMessage"] { background: #171b27; border: 1px solid #34394d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
-.badge-pro { background: #ffD700; color: #000; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
-.badge-free { background: #333333; color: #fff; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+[data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { color: #f7f8ff !important; }
+.nx-footer { text-align: center; color: #aab1c5; padding: 24px 0 8px; font-size: 13px; }
+.ad-banner { background: #1e2638; border: 1px dashed #4db6ac; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; color: #80cbc4; margin-bottom: 15px; }
 </style>
 """
 
 st.markdown(get_theme_css(st.session_state.theme), unsafe_allow_html=True)
 
 # ============================================================
-# 5. STATE MANAGEMENT & HELPER FUNCTIONS
+# 4. STATE MANAGEMENT & HELPER FUNCTIONS
 # ============================================================
 
-db_chats = db_load_chats(st.session_state.username)
+db_chats = db_load_chats()
 if "chats" not in st.session_state:
     st.session_state.chats = db_chats if db_chats else {}
 
@@ -273,7 +180,7 @@ def make_chat():
     cid = str(uuid.uuid4())
     created = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M")
     title = "New Chat"
-    db_save_chat(cid, st.session_state.username, title, created)
+    db_save_chat(cid, title, created)
     return cid, {"title": title, "created": created, "messages": []}
 
 if not st.session_state.chats:
@@ -282,7 +189,10 @@ if not st.session_state.chats:
     st.session_state.active_chat = cid
 
 if "active_chat" not in st.session_state or st.session_state.active_chat not in st.session_state.chats:
-    st.session_state.active_chat = next(iter(st.session_state.chats)) if st.session_state.chats else make_chat()[0]
+    st.session_state.active_chat = next(iter(st.session_state.chats))
+
+if "mode" not in st.session_state:
+    st.session_state.mode = "General"
 
 def new_chat():
     cid, chat_obj = make_chat()
@@ -291,7 +201,7 @@ def new_chat():
 
 def get_client():
     if not API_KEY:
-        st.error("Error: OPENROUTER_API_KEY missing.")
+        st.error("Error: OPENROUTER_API_KEY missing. Please add it to .env or environment variables.")
         st.stop()
     return OpenAI(
         api_key=API_KEY,
@@ -300,14 +210,11 @@ def get_client():
         timeout=90.0,
     )
 
+# Text To Speech Generator
 def text_to_speech(text):
     try:
         clean_text = re.sub(r'<[^>]+>', '', text)
-        bn_chars = len(re.findall(r'[\u0980-\u09FF]', clean_text))
-        en_chars = len(re.findall(r'[a-zA-Z]', clean_text))
-        lang = 'bn' if bn_chars > en_chars else 'en'
-        
-        tts = gTTS(text=clean_text[:500], lang=lang)
+        tts = gTTS(text=clean_text[:500], lang='bn' if any(ord(char) > 0x0980 and ord(char) < 0x09FF for char in clean_text) else 'en')
         fp = io.BytesIO()
         tts.write_to_fp(fp)
         fp.seek(0)
@@ -315,24 +222,7 @@ def text_to_speech(text):
     except Exception:
         return None
 
-def web_search(query):
-    try:
-        results = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=3):
-                results.append(f"Title: {r.get('title')}\nSnippet: {r.get('body')}\nURL: {r.get('href')}")
-        return "\n\n".join(results) if results else "No relevant web results found."
-    except Exception as e:
-        return f"Web search error: {str(e)}"
-
-def generate_pollinations_image(prompt):
-    try:
-        encoded_prompt = requests.utils.quote(prompt)
-        image_url = f"https://pollinations.ai/p/{encoded_prompt}"
-        return image_url
-    except Exception:
-        return None
-
+# Python Code Runner Sandbox
 def execute_python_code(code_str):
     buffer = io.StringIO()
     import sys
@@ -342,10 +232,56 @@ def execute_python_code(code_str):
         exec(code_str, exec_globals)
         output = buffer.getvalue()
         sys.stdout = sys.__stdout__
-        return output if output else "Executed successfully."
+        return output if output else "Code executed successfully with no output."
     except Exception as e:
         sys.stdout = sys.__stdout__
-        return f"Error: {str(e)}"
+        return f"Execution Error: {str(e)}"
+
+# Features: Weather, Search, Image
+WEATHER_WORDS = ["weather", "temperature", "forecast", "abawa", "আবহাওয়া", "আবহাওয়া", "তাপমাত্রা"]
+
+def is_weather_question(text):
+    return any(word in text.lower() for word in WEATHER_WORDS)
+
+def get_world_weather(location):
+    try:
+        geo_res = requests.get("https://geocoding-api.open-meteo.com/v1/search", params={"name": location, "count": 1}, timeout=10).json()
+        if not geo_res.get("results"):
+            return f"❌ Location **{location}** not found."
+        place = geo_res["results"][0]
+        lat, lon = place["latitude"], place["longitude"]
+        w_res = requests.get("https://api.open-meteo.com/v1/forecast", params={
+            "latitude": lat, "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m"
+        }, timeout=10).json()
+        curr = w_res["current"]
+        return (
+            f"## 🌍 Weather for {place.get('name')}, {place.get('country', '')}\n"
+            f"- 🌡️ **Temperature:** {curr['temperature_2m']}°C\n"
+            f"- 🤗 **Feels Like:** {curr['apparent_temperature']}°C\n"
+            f"- 💧 **Humidity:** {curr['relative_humidity_2m']}%\n"
+            f"- 💨 **Wind Speed:** {curr['wind_speed_10m']} km/h"
+        )
+    except Exception as e:
+        return f"Weather Error: {str(e)}"
+
+def search_web(query):
+    try:
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=4):
+                results.append(f"Title: {r.get('title')}\nSummary: {r.get('body')}")
+        return "\n\n".join(results) if results else "No live results found."
+    except Exception as exc:
+        return "Search Error: " + str(exc)[:100]
+
+def generate_ai_image(prompt):
+    try:
+        url = f"https://pollinations.ai/p/{requests.utils.quote(prompt)}?width=1024&height=1024&nologo=true"
+        res = requests.get(url, timeout=40)
+        return res.content if res.status_code == 200 else None
+    except Exception:
+        return None
 
 def get_ai_response(history):
     client = get_client()
@@ -356,193 +292,184 @@ def get_ai_response(history):
     return response.choices[0].message.content if response.choices else ""
 
 # ============================================================
-# 6. SIDEBAR & ADMIN DASHBOARD (VISIBLE PRO TOOLS)
+# 5. SIDEBAR & TOOLS
 # ============================================================
 
-active_chat_data = st.session_state.chats.get(st.session_state.active_chat, {"title": "New Chat", "messages": []})
+active_chat_data = st.session_state.chats[st.session_state.active_chat]
 
 with st.sidebar:
-    st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
-    
-    if st.session_state.is_premium == 1 or st.session_state.is_admin:
-        st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-pro">👑 PRO VIP</span>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-free">🔒 FREE TRIAL</span>', unsafe_allow_html=True)
-        st.caption(f"🎁 ফ্রি মেসেজ বাকি: {st.session_state.free_msgs_left}টি")
-
-    if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
-        st.session_state.is_admin = False
-        st.rerun()
-
-    st.divider()
+    st.markdown('<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="nx-subtitle">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
     if st.button("＋ New Chat", use_container_width=True, type="primary"):
         new_chat()
         st.rerun()
 
-    st.divider()
-
-    # ADMIN SECRET CODE
-    if not st.session_state.is_admin:
-        with st.expander("🔑 Admin Login / Secret Code"):
-            code_input = st.text_input("Enter Admin Code", type="password")
-            if st.button("Verify Admin"):
-                if code_input == "Ap202631$":
-                    st.session_state.is_admin = True
-                    db_upgrade_user_to_premium(st.session_state.username)
-                    st.session_state.is_premium = 1
-                    st.success("Admin Activated!")
-                    st.rerun()
-                else:
-                    st.error("ভুল সিক্রেট কোড!")
-
-    if st.session_state.is_admin:
-        st.markdown("### 👑 Admin Panel (Cash Unlock)")
-        friend_username = st.text_input("Friend's Username to Unlock")
-        if st.button("Unlock Friend's Pro"):
-            if friend_username.strip():
-                db_upgrade_user_to_premium(friend_username.strip())
-                st.success(f"'{friend_username}' এর একাউন্ট প্রিমিয়াম করা হয়েছে!")
-            else:
-                st.warning("ইউজারনেম লিখুন।")
+    selected_theme = st.selectbox("🎨 App Theme", ["Dark", "Light"], index=0 if st.session_state.theme == "Dark" else 1)
+    if selected_theme != st.session_state.theme:
+        st.session_state.theme = selected_theme
+        st.rerun()
 
     st.divider()
 
-    # PAYMENT SECTION FOR FREE USERS
-    if st.session_state.is_premium == 0 and not st.session_state.is_admin:
-        with st.expander("💎 Unlock Pro (50 BDT)"):
-            st.markdown("""
-            **বিকাশ / নগদ পার্সোনাল নম্বর:**  
-            `01711197695` (Send Money)  
-            
-            ৫০ টাকা পাঠিয়ে TrxID দিন:
-            """)
-            trx_input = st.text_input("Enter TrxID")
-            if st.button("Verify Payment"):
-                if trx_input.strip():
-                    db_upgrade_user_to_premium(st.session_state.username)
-                    st.session_state.is_premium = 1
-                    st.success("প্রিমিয়াম আনলক হয়েছে!")
-                    st.rerun()
-
-    # PRO EXCLUSIVE TOOLS (ALWAYS VISIBLE IN SIDEBAR FOR EASY ACCESS)
-    st.markdown("### 🛠️ Pro & Study Tools")
+    st.markdown("### 🛠️ Advanced Tools")
     
-    with st.expander("🎨 AI Image Generator"):
-        if st.session_state.is_premium == 1 or st.session_state.is_admin:
-            img_prompt = st.text_input("Image Description:", "A futuristic sci-fi city in Bangladesh")
-            if st.button("Generate Image"):
-                img_url = generate_pollinations_image(img_prompt)
-                if img_url:
-                    st.image(img_url, caption=img_prompt)
-        else:
-            st.warning("🔒 ইমেজ জেনারেশন ফিচারটি আনলক করতে প্রো (Pro) হোন অথবা অ্যাডমিন কোড দিন।")
-
+    # Python Code Runner Tool
     with st.expander("🐍 Python Code Runner"):
-        if st.session_state.is_premium == 1 or st.session_state.is_admin:
-            code_input = st.text_area("Python Code:", "print('Pro Tools Unlocked!')", height=80)
-            if st.button("Run Code"):
-                st.code(execute_python_code(code_input))
-        else:
-            st.warning("🔒 পাইথন কোড রানার ফিচারটি কেবল প্রো ব্যবহারকারীদের জন্য।")
+        code_input = st.text_area("Write Python Code:", "print('Hello Nxmini AI!')", height=100)
+        if st.button("Run Code", use_container_width=True):
+            out = execute_python_code(code_input)
+            st.code(out, language="text")
+
+    # Voice Input
+    with st.expander("🎙️ Voice Command"):
+        tool_audio = st.audio_input("Record Voice Note", key="sidebar_audio_in")
+        if tool_audio and st.button("Process Voice", use_container_width=True):
+            st.info("Processing voice audio...")
+            active_chat_data["messages"].append({"role": "user", "content": "[Voice Input Received]"})
+            db_save_message(st.session_state.active_chat, "user", "[Voice Input Received]")
+            ans = get_ai_response(active_chat_data["messages"])
+            active_chat_data["messages"].append({"role": "assistant", "content": ans})
+            db_save_message(st.session_state.active_chat, "assistant", ans)
+            st.rerun()
+
+    # Image Generator
+    with st.expander("🖼️ AI Image Generator"):
+        gen_box_prompt = st.text_input("Describe image...", key="sidebar_img_gen")
+        if st.button("Generate Image", use_container_width=True):
+            if gen_box_prompt.strip():
+                with st.spinner("Generating..."):
+                    img_bytes = generate_ai_image(gen_box_prompt.strip())
+                    if img_bytes:
+                        active_chat_data["messages"].append({"role": "user", "content": f"Generate Image: {gen_box_prompt}"})
+                        active_chat_data["messages"].append({"role": "assistant", "content": img_bytes, "type": "image"})
+                        db_save_message(st.session_state.active_chat, "assistant", "Image Generated", msg_type="image")
+                        st.rerun()
 
     st.divider()
-    st.markdown("### Chat History")
+
+    st.markdown("### AI Modes")
+    st.session_state.mode = st.selectbox("Select Mode", ["General", "Coding", "Math", "Study", "Writing"])
+
+    st.divider()
+
+    st.markdown("### Saved Chat History")
     for cid in list(st.session_state.chats.keys()):
         t = st.session_state.chats[cid]["title"]
-        if st.button("💬 " + t[:22], key="chat_" + cid, use_container_width=True):
+        if st.button("💬 " + t[:25], key="chat_" + cid, use_container_width=True):
             st.session_state.active_chat = cid
             st.rerun()
 
-    if st.button("🗑️ Clear Chat", use_container_width=True):
+    st.divider()
+
+    if st.button("🗑️ Clear Active Chat", use_container_width=True):
         db_clear_chat(st.session_state.active_chat)
-        if st.session_state.active_chat in st.session_state.chats:
-            del st.session_state.chats[st.session_state.active_chat]
+        del st.session_state.chats[st.session_state.active_chat]
         new_chat()
         st.rerun()
 
 # ============================================================
-# 7. MAIN INTERFACE (Study Help, File/Image Upload & Voice Listen)
+# 6. MAIN INTERFACE & MONETIZATION BANNER
 # ============================================================
 
-st.markdown('<div class="nx-status">✦ NXMINI AI · STUDY & ENTERPRISE SUITE</div>', unsafe_allow_html=True)
-
-# Study & Assignment Feature / File Upload
-uploaded_file = None
-attached_text = ""
-with st.expander("📚 Study & Assignment Helper (Attach File / Image)", expanded=False):
-    st.markdown("প পড়াশোনার নোট, অ্যাসাইনমেন্ট বা ছবি আপলোড করে এআই-এর সাহায্য নিন:")
-    if st.session_state.is_premium == 1 or st.session_state.is_admin:
-        uploaded_file = st.file_uploader("Attach Document or Image:", type=["png", "jpg", "jpeg", "txt", "pdf"])
-        if uploaded_file is not None:
-            if uploaded_file.type.startswith("image"):
-                img = Image.open(uploaded_file)
-                st.image(img, caption="Attached Image", width=250)
-                attached_text = "[User attached an image for study reference]"
-            else:
-                attached_text = str(uploaded_file.read().decode("utf-8", errors="ignore"))
-    else:
-        st.info("🔒 ফাইল বা ডকুমেন্ট অ্যাটাচমেন্ট ফিচারটি প্রিমিয়াম (PRO) ইউজারদের জন্য।")
-
 chat = active_chat_data
-messages = chat.get("messages", [])
+messages = chat["messages"]
+
+st.markdown('<div class="nx-status">✦ NXMINI AI · ENTERPRISE SUITE V3.0</div>', unsafe_allow_html=True)
+
+# Monetization & Offer Banner
+st.markdown("""
+<div class="ad-banner">
+    💎 <strong>Nxmini AI Pro Option Available!</strong> Unlock local bKash/Nagad auto-payments & Premium AI Models. 
+    <a href="#" style="color:#00e676; text-decoration:none; font-weight:bold;">Upgrade Now</a>
+</div>
+""", unsafe_allow_html=True)
 
 if not messages:
     st.markdown("""
-    <h1>How can I help you study today?</h1>
-    <p>আপনার যেকোনো পড়াশোনা, অ্যাসাইনমেন্ট, ওয়েব সার্চ বা কোডিং সমস্যা এখানে জিজ্ঞেস করুন।</p>
+    <div class="nx-welcome">
+        <h1>How can I help you today?</h1>
+        <p>Enterprise ChatGPT Suite: Python Interpreter, Audio TTS, DB Storage, Web Search, Weather & AI Image Generation.</p>
+    </div>
     """, unsafe_allow_html=True)
 
+# Render Chat History
 for idx, item in enumerate(messages):
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
-        st.markdown(item["content"])
-        # Voice Listen Button for AI Responses
-        if item["role"] == "assistant":
-            if st.session_state.is_premium == 1 or st.session_state.is_admin:
-                if st.button(f"🔊 Listen (Voice)", key=f"tts_{idx}"):
+        if item.get("type") == "image":
+            st.image(item["content"], caption="Nxmini AI Output")
+        else:
+            st.markdown(item["content"])
+            
+            # Text To Speech Audio Player Button for AI Messages
+            if item["role"] == "assistant" and isinstance(item["content"], str):
+                if st.button(f"🔊 Listen Response", key=f"tts_{idx}"):
                     audio_fp = text_to_speech(item["content"])
                     if audio_fp:
                         st.audio(audio_fp, format="audio/mp3")
-            else:
-                st.caption("🔒 ভয়েস লিসেন (Voice) ফিচারটি প্রো ইউজারদের জন্য।")
 
-user_input = st.chat_input("Ask study questions, assignments, or web search...")
+# ============================================================
+# 7. CHAT INPUT & PROCESSOR
+# ============================================================
+
+user_input = st.chat_input("Message Nxmini AI (Type 'search: [query]' for web search)...")
 
 if user_input and user_input.strip():
-    if st.session_state.is_premium == 0 and not st.session_state.is_admin and st.session_state.free_msgs_left <= 0:
-        st.error("❌ ফ্রি মেসেজ শেষ! ফুল অ্যাক্সেস পেতে সাইডবারের 'Unlock Pro' অপশন থেকে পেমেন্ট করুন।")
-    else:
-        full_query = user_input.strip()
-        
-        # Web Search Integration
-        if "search" in full_query.lower() or "find" in full_query.lower() or "news" in full_query.lower() or "কে" in full_query or "কোথায়" in full_query:
-            with st.spinner("Searching the web..."):
-                search_data = web_search(full_query)
-                full_query = f"{full_query}\n\nWeb Search Results:\n{search_data}"
+    original_prompt = user_input.strip()
+    api_prompt = f"[{st.session_state.mode} Mode] " + original_prompt
 
-        if uploaded_file is not None and attached_text and (st.session_state.is_premium == 1 or st.session_state.is_admin):
-            full_query = f"{full_query}\n\nAttached Study Context:\n{attached_text[:2000]}"
+    if original_prompt.lower().startswith(("search:", "web:", "find:")):
+        search_term = re.sub(r'^(search:|web:|find:)\s*', '', original_prompt, flags=re.IGNORECASE)
+        with st.spinner(f"Searching web for: {search_term}..."):
+            web_context = search_web(search_term)
+            api_prompt += f"\n\nLive Web Search Results:\n{web_context}"
 
-        chat["messages"].append({"role": "user", "content": user_input.strip()})
-        db_save_message(st.session_state.active_chat, "user", user_input.strip())
+    # Save User Msg
+    chat["messages"].append({"role": "user", "content": original_prompt})
+    db_save_message(st.session_state.active_chat, "user", original_prompt)
 
-        if st.session_state.is_premium == 0 and not st.session_state.is_admin:
-            db_decrement_free_msg(st.session_state.username)
+    if chat["title"] == "New Chat":
+        chat["title"] = original_prompt[:30]
+        db_save_chat(st.session_state.active_chat, chat["title"], chat["created"])
 
-        if chat["title"] == "New Chat":
-            chat["title"] = user_input.strip()[:30]
-            db_save_chat(st.session_state.active_chat, st.session_state.username, chat["title"], chat["created"])
+    with st.chat_message("user", avatar="🧑‍💻"):
+        st.markdown(original_prompt)
 
-        with st.chat_message("user", avatar="🧑‍💻"):
-            st.markdown(user_input.strip())
+    with st.chat_message("assistant", avatar="✨"):
+        try:
+            start_time = time.time()
+            if is_weather_question(original_prompt):
+                loc = original_prompt.lower()
+                for w in WEATHER_WORDS:
+                    loc = loc.replace(w, "")
+                loc = loc.replace("in", "").replace("at", "").replace("for", "").strip()
+                ans = get_world_weather(loc if loc else "Dhaka")
+            else:
+                with st.spinner("Nxmini AI is thinking..."):
+                    api_history = list(chat["messages"])
+                    api_history[-1] = {"role": "user", "content": api_prompt}
+                    ans = get_ai_response(api_history)
+            
+            latency = round(time.time() - start_time, 2)
+            st.markdown(ans)
+            st.caption(f"⏱️ Response time: {latency}s")
+        except Exception as exc:
+            ans = f"Error: {str(exc)}"
+            latency = 0.0
+            st.error(ans)
 
-        with st.chat_message("assistant", avatar="✨"):
-            with st.spinner("Nxmini AI is analyzing..."):
-                ans = get_ai_response([{"role": "user", "content": full_query}])
-                st.markdown(ans)
+    # Save Assistant Msg
+    chat["messages"].append({"role": "assistant", "content": ans, "latency": latency})
+    db_save_message(st.session_state.active_chat, "assistant", ans, latency=latency)
+    st.rerun()
 
-        chat["messages"].append({"role": "assistant", "content": ans})
-        db_save_message(st.session_state.active_chat, "assistant", ans)
-        st.rerun()
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.markdown("""
+<div class="nx-footer">
+    Nxmini AI v3.0 (Full Suite with DB + Code Executor) · <strong>Created by Apan2026</strong>
+</div>
+""", unsafe_allow_html=True)
