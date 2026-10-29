@@ -211,7 +211,7 @@ if not st.session_state.logged_in:
                 else:
                     st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
             else:
-                st.warning("সব ফিল্ড পূরণ করুন።")
+                st.warning("সব ফিল্ড পূরণ করুন।")
     st.stop()
 
 u_info = db_get_user_info(st.session_state.username)
@@ -303,7 +303,6 @@ def get_client():
 def text_to_speech(text):
     try:
         clean_text = re.sub(r'<[^>]+>', '', text)
-        # Auto-detect language: if Bengali characters are more, use 'bn', otherwise 'en'
         bn_chars = len(re.findall(r'[\u0980-\u09FF]', clean_text))
         en_chars = len(re.findall(r'[a-zA-Z]', clean_text))
         lang = 'bn' if bn_chars > en_chars else 'en'
@@ -357,7 +356,7 @@ def get_ai_response(history):
     return response.choices[0].message.content if response.choices else ""
 
 # ============================================================
-# 6. SIDEBAR & ADMIN DASHBOARD
+# 6. SIDEBAR & ADMIN DASHBOARD (VISIBLE PRO TOOLS)
 # ============================================================
 
 active_chat_data = st.session_state.chats.get(st.session_state.active_chat, {"title": "New Chat", "messages": []})
@@ -410,7 +409,7 @@ with st.sidebar:
 
     st.divider()
 
-    # PAYMENT SECTION
+    # PAYMENT SECTION FOR FREE USERS
     if st.session_state.is_premium == 0 and not st.session_state.is_admin:
         with st.expander("💎 Unlock Pro (50 BDT)"):
             st.markdown("""
@@ -426,19 +425,27 @@ with st.sidebar:
                     st.session_state.is_premium = 1
                     st.success("প্রিমিয়াম আনলক হয়েছে!")
                     st.rerun()
-    else:
-        st.markdown("### 🛠️ Pro Exclusive Tools")
-        with st.expander("🎨 AI Image Generator"):
+
+    # PRO EXCLUSIVE TOOLS (ALWAYS VISIBLE IN SIDEBAR FOR EASY ACCESS)
+    st.markdown("### 🛠️ Pro & Study Tools")
+    
+    with st.expander("🎨 AI Image Generator"):
+        if st.session_state.is_premium == 1 or st.session_state.is_admin:
             img_prompt = st.text_input("Image Description:", "A futuristic sci-fi city in Bangladesh")
             if st.button("Generate Image"):
                 img_url = generate_pollinations_image(img_prompt)
                 if img_url:
                     st.image(img_url, caption=img_prompt)
-        
-        with st.expander("🐍 Python Code Runner"):
+        else:
+            st.warning("🔒 ইমেজ জেনারেশন ফিচারটি আনলক করতে প্রো (Pro) হোন অথবা অ্যাডমিন কোড দিন।")
+
+    with st.expander("🐍 Python Code Runner"):
+        if st.session_state.is_premium == 1 or st.session_state.is_admin:
             code_input = st.text_area("Python Code:", "print('Pro Tools Unlocked!')", height=80)
             if st.button("Run Code"):
                 st.code(execute_python_code(code_input))
+        else:
+            st.warning("🔒 পাইথন কোড রানার ফিচারটি কেবল প্রো ব্যবহারকারীদের জন্য।")
 
     st.divider()
     st.markdown("### Chat History")
@@ -456,43 +463,52 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# 7. MAIN INTERFACE
+# 7. MAIN INTERFACE (Study Help, File/Image Upload & Voice Listen)
 # ============================================================
 
-st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE ENTERPRISE SUITE</div>', unsafe_allow_html=True)
+st.markdown('<div class="nx-status">✦ NXMINI AI · STUDY & ENTERPRISE SUITE</div>', unsafe_allow_html=True)
 
+# Study & Assignment Feature / File Upload
 uploaded_file = None
 attached_text = ""
-if st.session_state.is_premium == 1 or st.session_state.is_admin:
-    uploaded_file = st.file_uploader("📎 Attach Document or Image (Pro Exclusive):", type=["png", "jpg", "jpeg", "txt", "pdf"])
-    if uploaded_file is not None:
-        if uploaded_file.type.startswith("image"):
-            img = Image.open(uploaded_file)
-            st.image(img, caption="Attached Image", width=250)
-            attached_text = "[User attached an image]"
-        else:
-            attached_text = str(uploaded_file.read().decode("utf-8", errors="ignore"))
+with st.expander("📚 Study & Assignment Helper (Attach File / Image)", expanded=False):
+    st.markdown("প পড়াশোনার নোট, অ্যাসাইনমেন্ট বা ছবি আপলোড করে এআই-এর সাহায্য নিন:")
+    if st.session_state.is_premium == 1 or st.session_state.is_admin:
+        uploaded_file = st.file_uploader("Attach Document or Image:", type=["png", "jpg", "jpeg", "txt", "pdf"])
+        if uploaded_file is not None:
+            if uploaded_file.type.startswith("image"):
+                img = Image.open(uploaded_file)
+                st.image(img, caption="Attached Image", width=250)
+                attached_text = "[User attached an image for study reference]"
+            else:
+                attached_text = str(uploaded_file.read().decode("utf-8", errors="ignore"))
+    else:
+        st.info("🔒 ফাইল বা ডকুমেন্ট অ্যাটাচমেন্ট ফিচারটি প্রিমিয়াম (PRO) ইউজারদের জন্য।")
 
 chat = active_chat_data
 messages = chat.get("messages", [])
 
 if not messages:
     st.markdown("""
-    <h1>How can I help you today?</h1>
-    <p>আপনার যেকোনো প্রশ্ন বা কোডিং সমস্যা এখানে জিজ্ঞেস করুন।</p>
+    <h1>How can I help you study today?</h1>
+    <p>আপনার যেকোনো পড়াশোনা, অ্যাসাইনমেন্ট, ওয়েব সার্চ বা কোডিং সমস্যা এখানে জিজ্ঞেস করুন।</p>
     """, unsafe_allow_html=True)
 
 for idx, item in enumerate(messages):
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
         st.markdown(item["content"])
-        if item["role"] == "assistant" and (st.session_state.is_premium == 1 or st.session_state.is_admin):
-            if st.button(f"🔊 Listen (Voice)", key=f"tts_{idx}"):
-                audio_fp = text_to_speech(item["content"])
-                if audio_fp:
-                    st.audio(audio_fp, format="audio/mp3")
+        # Voice Listen Button for AI Responses
+        if item["role"] == "assistant":
+            if st.session_state.is_premium == 1 or st.session_state.is_admin:
+                if st.button(f"🔊 Listen (Voice)", key=f"tts_{idx}"):
+                    audio_fp = text_to_speech(item["content"])
+                    if audio_fp:
+                        st.audio(audio_fp, format="audio/mp3")
+            else:
+                st.caption("🔒 ভয়েস লিসেন (Voice) ফিচারটি প্রো ইউজারদের জন্য।")
 
-user_input = st.chat_input("Message Nxmini AI...")
+user_input = st.chat_input("Ask study questions, assignments, or web search...")
 
 if user_input and user_input.strip():
     if st.session_state.is_premium == 0 and not st.session_state.is_admin and st.session_state.free_msgs_left <= 0:
@@ -500,13 +516,14 @@ if user_input and user_input.strip():
     else:
         full_query = user_input.strip()
         
-        if "search" in full_query.lower() or "find" in full_query.lower() or "news" in full_query.lower():
+        # Web Search Integration
+        if "search" in full_query.lower() or "find" in full_query.lower() or "news" in full_query.lower() or "কে" in full_query or "কোথায়" in full_query:
             with st.spinner("Searching the web..."):
                 search_data = web_search(full_query)
                 full_query = f"{full_query}\n\nWeb Search Results:\n{search_data}"
 
         if uploaded_file is not None and attached_text and (st.session_state.is_premium == 1 or st.session_state.is_admin):
-            full_query = f"{full_query}\n\nAttached Context:\n{attached_text[:2000]}"
+            full_query = f"{full_query}\n\nAttached Study Context:\n{attached_text[:2000]}"
 
         chat["messages"].append({"role": "user", "content": user_input.strip()})
         db_save_message(st.session_state.active_chat, "user", user_input.strip())
