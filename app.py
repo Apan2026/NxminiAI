@@ -191,6 +191,13 @@ if not st.session_state.logged_in:
                 st.session_state.username = l_user
                 st.session_state.is_premium = res[0]
                 st.session_state.free_msgs_left = res[1]
+                
+                # Auto check if admin username
+                if l_user.lower() in ["apan", "admin"]:
+                    st.session_state.is_admin = True
+                    db_upgrade_user_to_premium(l_user)
+                    st.session_state.is_premium = 1
+
                 st.success("লগইন সফল হয়েছে!")
                 st.rerun()
             else:
@@ -212,7 +219,10 @@ if not st.session_state.logged_in:
 # Refresh user status from DB
 u_info = db_get_user_info(st.session_state.username)
 if u_info:
-    st.session_state.is_premium = u_info[0]
+    if st.session_state.is_admin:
+        st.session_state.is_premium = 1
+    else:
+        st.session_state.is_premium = u_info[0]
     st.session_state.free_msgs_left = u_info[1]
 
 # ============================================================
@@ -338,7 +348,7 @@ with st.sidebar:
     st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
     
     # Status Badge Display
-    if st.session_state.is_premium == 1:
+    if st.session_state.is_premium == 1 or st.session_state.is_admin:
         st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-pro">👑 PRO VIP</span>', unsafe_allow_html=True)
     else:
         st.markdown(f'👤 User: **{st.session_state.username}** <span class="badge-free">🔒 FREE TRIAL</span>', unsafe_allow_html=True)
@@ -371,7 +381,7 @@ with st.sidebar:
                 else:
                     st.error("ভুল সিক্রেট কোড!")
 
-    # IF ADMIN IS LOGGED IN, SHOW FRIEND'S ACCOUNT UNLOCK PANEL
+    # IF ADMIN IS LOGGED IN, SHOW FRIEND'S ACCOUNT UNLOCK PANEL & PRO TOOLS
     if st.session_state.is_admin:
         st.markdown("### 👑 Admin Panel (Cash Unlock)")
         st.success("অ্যাডমিন প্যানেল সক্রিয়।")
@@ -385,8 +395,8 @@ with st.sidebar:
 
     st.divider()
 
-    # REGULAR PREMIUM / bKash & Nagad PAYMENT STATUS
-    if st.session_state.is_premium == 0:
+    # REGULAR PREMIUM / bKash & Nagad PAYMENT STATUS OR PRO TOOLS
+    if st.session_state.is_premium == 0 and not st.session_state.is_admin:
         st.markdown("### 🔒 Unlock Pro (50 BDT)")
         st.info("সব ফিচার আজই আনলক করুন মাত্র ৫০ টাকায়!")
         
@@ -432,7 +442,7 @@ with st.sidebar:
 
 st.markdown('<div class="nx-status">✦ NXMINI AI · SECURE ENTERPRISE SUITE</div>', unsafe_allow_html=True)
 
-if st.session_state.is_premium == 0:
+if st.session_state.is_premium == 0 and not st.session_state.is_admin:
     st.markdown(f"""
     <div class="pay-box">
         ⚠️ <strong>ফ্রি ট্রায়াল চলছে!</strong> আপনার কাছে আর মাত্র <strong>{st.session_state.free_msgs_left}টি ফ্রি মেসেজ</strong> বাকি আছে। আনলিমিটেড অ্যাক্সেস পেতে মাত্র ৫০ টাকা বিকাশ বা নগদ পেমেন্ট করুন (নম্বর: <strong>01711197695</strong>) অথবা ক্যাশ দিয়ে অ্যাডমিনের থেকে একাউন্ট আনলক করুন।
@@ -452,7 +462,7 @@ for idx, item in enumerate(messages):
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
         st.markdown(item["content"])
-        if item["role"] == "assistant" and st.session_state.is_premium == 1:
+        if item["role"] == "assistant" and (st.session_state.is_premium == 1 or st.session_state.is_admin):
             if st.button(f"🔊 Listen", key=f"tts_{idx}"):
                 audio_fp = text_to_speech(item["content"])
                 if audio_fp:
@@ -462,7 +472,7 @@ user_input = st.chat_input("Message Nxmini AI...")
 
 if user_input and user_input.strip():
     # Check if free user has exceeded limit
-    if st.session_state.is_premium == 0 and st.session_state.free_msgs_left <= 0:
+    if st.session_state.is_premium == 0 and not st.session_state.is_admin and st.session_state.free_msgs_left <= 0:
         st.error("❌ আপনার ফ্রি মেসেজের লিমিট শেষ! ফুল ফিচার ব্যবহার করতে ৫০ টাকা পেমেন্ট করে একাউন্ট প্রিমিয়াম করুন অথবা অ্যাডমিনের সাথে যোগাযোগ করুন।")
     else:
         original_prompt = user_input.strip()
@@ -470,7 +480,7 @@ if user_input and user_input.strip():
         chat["messages"].append({"role": "user", "content": original_prompt})
         db_save_message(st.session_state.active_chat, "user", original_prompt)
 
-        if st.session_state.is_premium == 0:
+        if st.session_state.is_premium == 0 and not st.session_state.is_admin:
             db_decrement_free_msg(st.session_state.username)
 
         if chat["title"] == "New Chat":
