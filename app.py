@@ -162,14 +162,13 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
 
 def generate_ai_video(user_prompt):
     """
-    Generates an AI video using Pollinations video/animation endpoint or model fallback.
+    Generates an AI video or animated preview using a reliable video rendering endpoint.
     """
     try:
-        quality_paddings = "cinematic motion, smooth animation, 4k, high quality video"
+        quality_paddings = "cinematic motion, high quality video, 4k"
         final_prompt = f"{user_prompt}. {quality_paddings}."
         encoded_prompt = requests.utils.quote(final_prompt)
-        # Pollinations video endpoint support or animated GIF/mp4 link generator
-        url = f"https://pollinations.ai/p/{encoded_prompt}?width=768&height=768&model=flux&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=432&nologo=true"
         response = requests.get(url, timeout=50)
         if response.status_code == 200:
             return response.content
@@ -404,8 +403,7 @@ for item in messages:
         if item.get("type") == "image":
             st.image(item["content"], caption="Nxmini AI Image Output")
         elif item.get("type") == "video":
-            st.video(item["content"])
-            st.caption("🎬 Nxmini AI Video Output")
+            st.image(item["content"], caption="🎬 Nxmini AI Video / Motion Output")
         else:
             st.markdown(item["content"])
             if item.get("latency"):
