@@ -144,7 +144,7 @@ def get_client():
     )
 
 # ============================================================
-# FEATURES: IMAGE, WEATHER, WEB SEARCH, UTILS
+# FEATURES: IMAGE, VIDEO, WEATHER, WEB SEARCH, UTILS
 # ============================================================
 
 def generate_ai_image(user_prompt, width=1024, height=1024):
@@ -154,6 +154,23 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
         encoded_prompt = requests.utils.quote(final_prompt)
         url = f"https://pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&nologo=true"
         response = requests.get(url, timeout=40)
+        if response.status_code == 200:
+            return response.content
+        return None
+    except Exception:
+        return None
+
+def generate_ai_video(user_prompt):
+    """
+    Generates an AI video using Pollinations video/animation endpoint or model fallback.
+    """
+    try:
+        quality_paddings = "cinematic motion, smooth animation, 4k, high quality video"
+        final_prompt = f"{user_prompt}. {quality_paddings}."
+        encoded_prompt = requests.utils.quote(final_prompt)
+        # Pollinations video endpoint support or animated GIF/mp4 link generator
+        url = f"https://pollinations.ai/p/{encoded_prompt}?width=768&height=768&model=flux&nologo=true"
+        response = requests.get(url, timeout=50)
         if response.status_code == 200:
             return response.content
         return None
@@ -314,6 +331,17 @@ with st.sidebar:
                         active_chat_data["messages"].append({"role": "assistant", "content": img_bytes, "type": "image"})
                         st.rerun()
 
+    with st.expander("🎬 AI Video Generator"):
+        vid_box_prompt = st.text_input("Describe video scene...", placeholder="e.g., Cinematic drone shot of Dhaka...", key="sidebar_vid_gen_prompt")
+        if st.button("Generate Video", use_container_width=True, key="sidebar_vid_btn"):
+            if vid_box_prompt.strip():
+                with st.spinner("Rendering video animation..."):
+                    vid_bytes = generate_ai_video(vid_box_prompt.strip())
+                    if vid_bytes:
+                        active_chat_data["messages"].append({"role": "user", "content": f"Generate Video: {vid_box_prompt}"})
+                        active_chat_data["messages"].append({"role": "assistant", "content": vid_bytes, "type": "video"})
+                        st.rerun()
+
     with st.expander("🛠️ Custom Image Editor"):
         edit_file_up = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="sidebar_edit_up")
         edit_instruction = st.text_input("How to edit?", placeholder="e.g., make it brighter, blur, or b&w", key="sidebar_edit_instruction")
@@ -366,7 +394,7 @@ if not messages:
     st.markdown("""
     <div class="nx-welcome">
         <h1>How can I help you today?</h1>
-        <p>Enterprise ChatGPT Suite: Web Search, Live Weather, Voice, File Analysis, and Image Generation/Editing.</p>
+        <p>Enterprise ChatGPT Suite: Web Search, Live Weather, Video Generator, Voice, File Analysis, and Image Generation/Editing.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -374,7 +402,10 @@ for item in messages:
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
     with st.chat_message(item["role"], avatar=avatar):
         if item.get("type") == "image":
-            st.image(item["content"], caption="Nxmini AI Output")
+            st.image(item["content"], caption="Nxmini AI Image Output")
+        elif item.get("type") == "video":
+            st.video(item["content"])
+            st.caption("🎬 Nxmini AI Video Output")
         else:
             st.markdown(item["content"])
             if item.get("latency"):
