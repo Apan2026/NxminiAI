@@ -4,7 +4,6 @@ import re
 import base64
 import uuid
 import time
-import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -14,47 +13,6 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image, ImageEnhance, ImageFilter
 from duckduckgo_search import DDGS
-
-# ============================================================
-# 1. DATABASE MANAGEMENT (LOGIN & USERS)
-# ============================================================
-
-DB_FILE = "nxmini_enterprise.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT,
-            is_premium INTEGER DEFAULT 1,
-            free_msgs_left INTEGER DEFAULT 3
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def db_register_user(username, password):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, password, is_premium, free_msgs_left) VALUES (?, ?, 1, 3)", (username, password))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception:
-        return False
-
-def db_check_user(username, password):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT is_premium, free_msgs_left FROM users WHERE username=? AND password=?", (username, password))
-    res = c.fetchone()
-    conn.close()
-    return res
 
 # ============================================================
 # NXMINI AI CONFIGURATION
@@ -68,7 +26,6 @@ APP_TAGLINE = "Your AI. Your Universe."
 API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
 
-# সঠিক বাংলাদেশ টাইমজোন (BST / UTC+6) সিস্টেম প্রম্পটে ইনজেক্ট করার জন্য
 current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M:%S")
 
 SYSTEM_PROMPT = f"""
@@ -90,48 +47,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ============================================================
-# AUTHENTICATION & LOGIN STATE
-# ============================================================
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.username = ""
-    st.session_state.free_msgs_left = 3
-
-if not st.session_state.logged_in:
-    st.title("🔐 Nxmini AI - Login / Register")
-    st.write("স্মার্ট এআই অভিজ্ঞতা পেতে লগইন বা নতুন একাউন্ট তৈরি করুন।")
-
-    tab1, tab2 = st.tabs(["Login", "Register (New Account)"])
-
-    with tab1:
-        l_user = st.text_input("Username", key="l_user")
-        l_pass = st.text_input("Password", type="password", key="l_pass")
-        if st.button("Login Now", type="primary"):
-            res = db_check_user(l_user, l_pass)
-            if res is not None:
-                st.session_state.logged_in = True
-                st.session_state.username = l_user
-                st.session_state.free_msgs_left = res[1]
-                st.success("লগইন সফল হয়েছে!")
-                st.rerun()
-            else:
-                st.error("ভুল ইউজারনেম অথবা পাসওয়ার্ড!")
-
-    with tab2:
-        r_user = st.text_input("Choose Username", key="r_user")
-        r_pass = st.text_input("Choose Password", type="password", key="r_pass")
-        if st.button("Create Account"):
-            if r_user and r_pass:
-                if db_register_user(r_user, r_pass):
-                    st.success("একাউন্ট তৈরি সফল হয়েছে! এখন Login ট্যাবে গিয়ে প্রবেশ করুন (৩টি ফ্রি মেসেজ সহ)।")
-                else:
-                    st.error("এই ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হচ্ছে।")
-            else:
-                st.warning("সব ফিল্ড পূরণ করুন।")
-    st.stop()
-
 # 🔍 GOOGLE SEARCH CONSOLE VERIFICATION META TAG
 st.markdown(
     """
@@ -143,7 +58,7 @@ st.markdown(
 )
 
 # ============================================================
-# THEME & STYLING MANAGEMENT (Sidebar Fixed White)
+# THEME & STYLING MANAGEMENT
 # ============================================================
 
 if "theme" not in st.session_state:
@@ -275,7 +190,7 @@ def edit_uploaded_image(image_bytes, instruction=""):
     except Exception:
         return None
 
-WEATHER_WORDS = ["weather", "temperature", "forecast", "climate", "abawa", "আবহাওয়া", "আবহাওয়া", "তাপমাত্রা", "বৃষ্টি"]
+WEATHER_WORDS = ["weather", "temperature", "forecast", "climate", "abawa", "আবহাওয়া", "তাপমাত্রা", "বৃষ্টি"]
 
 def is_weather_question(text):
     return any(word in text.lower() for word in WEATHER_WORDS)
@@ -350,23 +265,18 @@ def get_ai_response(history, images=None):
     return response.choices[0].message.content if response.choices else ""
 
 # ============================================================
-# SIDEBAR (ALL TOOLS & CONTROLS ORGANIZED HERE)
+# SIDEBAR
 # ============================================================
 
 active_chat_data = st.session_state.chats[st.session_state.active_chat]
 
 with st.sidebar:
     st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
-    st.markdown(f'👤 User: **{st.session_state.username}**')
-    if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.rerun()
+    st.markdown(f'👤 **Guest User / Enterprise Mode**')
 
     st.divider()
     st.markdown(f'<div class="nx-subtitle">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
-    # 1. New Chat & Theme Switcher
     if st.button("＋ New Chat", use_container_width=True, type="primary"):
         new_chat()
         st.rerun()
@@ -378,7 +288,6 @@ with st.sidebar:
 
     st.divider()
 
-    # 2. AI Tools Center (Expanders inside Sidebar)
     st.markdown("### 🛠️ AI Tools Center")
     
     with st.expander("📎 File & Image Upload"):
@@ -418,13 +327,11 @@ with st.sidebar:
 
     st.divider()
 
-    # 3. AI Mode Select
     st.markdown("### AI Modes")
     st.session_state.mode = st.selectbox("Select Mode", ["General", "Coding", "Math", "Study", "Writing"], key="sidebar_mode_select")
 
     st.divider()
 
-    # 4. Chat History & Management
     st.markdown("### Chat History")
     for cid in reversed(list(st.session_state.chats.keys())):
         t = st.session_state.chats[cid]["title"]
