@@ -1,9 +1,9 @@
-import os
 import io
+import os
 import re
-import base64
-import uuid
 import time
+import uuid
+import base64
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -25,13 +25,14 @@ APP_TAGLINE = "Your AI. Your Universe."
 
 API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
+ADSENSE_CLIENT_ID = os.getenv("ADSENSE_CLIENT_ID", "ca-pub-YOUR_PUBLISHER_ID").strip()
 
 current_live_time = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M:%S")
 
 SYSTEM_PROMPT = f"""
 You are Nxmini AI, a helpful, multilingual, and advanced AI assistant created by Apan2026.
 Current Live Bangladesh Standard Time & Date: {current_live_time} (BST / UTC+6).
-Your capabilities include coding, debugging, mathematics, research, detailed writing, reasoning, 
+Your capabilities include coding, debugging, mathematics, research, detailed writing, reasoning,
 and providing general knowledge.
 You are designed to offer a full enterprise-grade "ChatGPT-like" experience with integrated multi-modal tools.
 Always answer in the user's language (Bengali, English, etc.) clearly and step-by-step.
@@ -47,14 +48,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 🔍 GOOGLE SEARCH CONSOLE VERIFICATION META TAG
+# 🔍 GOOGLE SEARCH CONSOLE & ADSENSE META/SCRIPT
 st.markdown(
-    """
+    f"""
     <head>
         <meta name="google-site-verification" content="-RaqxtcaQXbC4nMlNvl92hSOrMqYIsucAie3k1exuTo" />
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={ADSENSE_CLIENT_ID}" crossorigin="anonymous"></script>
     </head>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # ============================================================
@@ -63,6 +65,7 @@ st.markdown(
 
 if "theme" not in st.session_state:
     st.session_state.theme = "Dark"
+
 
 def get_theme_css(theme):
     if theme == "Light":
@@ -83,8 +86,7 @@ def get_theme_css(theme):
 .nx-footer { text-align: center; color: #666666; padding: 24px 0 8px; font-size: 13px; }
 </style>
 """
-    else:
-        return """
+    return """
 <style>
 .stApp { background: #0b0d12; color: #f5f6ff; }
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #303547; }
@@ -103,11 +105,13 @@ def get_theme_css(theme):
 </style>
 """
 
+
 st.markdown(get_theme_css(st.session_state.theme), unsafe_allow_html=True)
 
 # ============================================================
 # STATE MANAGEMENT
 # ============================================================
+
 
 def make_chat():
     return {
@@ -115,6 +119,7 @@ def make_chat():
         "created": datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-%d %H:%M"),
         "messages": [],
     }
+
 
 if "chats" not in st.session_state:
     cid = str(uuid.uuid4())
@@ -127,10 +132,12 @@ if "active_chat" not in st.session_state or st.session_state.active_chat not in 
 if "mode" not in st.session_state:
     st.session_state.mode = "General"
 
+
 def new_chat():
     cid = str(uuid.uuid4())
     st.session_state.chats[cid] = make_chat()
     st.session_state.active_chat = cid
+
 
 def get_client():
     if not API_KEY:
@@ -143,9 +150,11 @@ def get_client():
         timeout=90.0,
     )
 
+
 # ============================================================
 # FEATURES: IMAGE, VIDEO, WEATHER, WEB SEARCH, UTILS
 # ============================================================
+
 
 def generate_ai_image(user_prompt, width=1024, height=1024):
     try:
@@ -160,15 +169,14 @@ def generate_ai_image(user_prompt, width=1024, height=1024):
     except Exception:
         return None
 
+
 def generate_ai_video(user_prompt):
-    """
-    Generates an AI video using Pollinations video/animation endpoint or model fallback.
-    """
+    """Generates a cinematic motion/animated preview frame via Pollinations endpoint."""
     try:
         quality_paddings = "cinematic motion, smooth animation, 4k, high quality video"
         final_prompt = f"{user_prompt}. {quality_paddings}."
         encoded_prompt = requests.utils.quote(final_prompt)
-        url = f"https://pollinations.ai/p/{encoded_prompt}?width=768&height=768&model=flux&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=432&nologo=true"
         response = requests.get(url, timeout=50)
         if response.status_code == 200:
             return response.content
@@ -176,20 +184,18 @@ def generate_ai_video(user_prompt):
     except Exception:
         return None
 
+
 def edit_uploaded_image(image_bytes, instruction=""):
     try:
         img = Image.open(io.BytesIO(image_bytes))
         inst = instruction.lower()
-        
+
         if "bright" in inst:
-            enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(1.5)
+            img = ImageEnhance.Brightness(img).enhance(1.5)
         elif "dark" in inst:
-            enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(0.7)
+            img = ImageEnhance.Brightness(img).enhance(0.7)
         elif "contrast" in inst:
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(1.8)
+            img = ImageEnhance.Contrast(img).enhance(1.8)
         elif "sharp" in inst:
             img = img.filter(ImageFilter.SHARPEN)
         elif "blur" in inst:
@@ -197,19 +203,21 @@ def edit_uploaded_image(image_bytes, instruction=""):
         elif "gray" in inst or "black & white" in inst or "b&w" in inst:
             img = img.convert("L")
         else:
-            enhancer = ImageEnhance.Color(img)
-            img = enhancer.enhance(1.2)
-            
+            img = ImageEnhance.Color(img).enhance(1.2)
+
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
     except Exception:
         return None
 
+
 WEATHER_WORDS = ["weather", "temperature", "forecast", "climate", "abawa", "আবহাওয়া", "তাপমাত্রা", "বৃষ্টি"]
+
 
 def is_weather_question(text):
     return any(word in text.lower() for word in WEATHER_WORDS)
+
 
 def get_world_weather(location):
     try:
@@ -220,10 +228,15 @@ def get_world_weather(location):
         place = geo_res["results"][0]
         lat, lon = place["latitude"], place["longitude"]
         weather_url = "https://api.open-meteo.com/v1/forecast"
-        w_res = requests.get(weather_url, params={
-            "latitude": lat, "longitude": lon,
-            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m"
-        }, timeout=10).json()
+        w_res = requests.get(
+            weather_url,
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m",
+            },
+            timeout=10,
+        ).json()
         curr = w_res["current"]
         return (
             f"## 🌍 Real-Time Weather for {place.get('name')}, {place.get('country', '')}\n\n"
@@ -235,11 +248,12 @@ def get_world_weather(location):
     except Exception as e:
         return f"Failed to retrieve global weather: {str(e)}"
 
+
 def read_attachment(upload):
     filename = upload.name
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     raw = upload.getvalue()
-    if ext in {"txt", "py", "html", "css", "js", "md", "json", "csv", "sql"}:
+    if ext in {"txt", "py", "html", "css", "js", "md", "json", "csv", "sql", "xml", "yaml", "yml", "log"}:
         return {"kind": "text", "name": filename, "content": raw.decode("utf-8", errors="replace")[:30000]}
     if ext in {"png", "jpg", "jpeg", "webp"}:
         encoded = base64.b64encode(raw).decode("utf-8")
@@ -248,21 +262,26 @@ def read_attachment(upload):
             "name": filename,
             "data": {
                 "type": "image_url",
-                "image_url": {"url": f"data:image/{ext};base64,{encoded}"}
+                "image_url": {"url": f"data:image/{ext};base64,{encoded}"},
             },
-            "raw_bytes": raw
+            "raw_bytes": raw,
         }
     return {"kind": "error", "name": filename, "content": f"Unsupported file format: {filename}"}
+
 
 def search_web(query):
     try:
         results = []
         with DDGS(headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}) as ddgs:
-            for r in ddgs.text(query, max_results=4):
-                results.append(f"Title: {r.get('title')}\nSummary: {r.get('body')}")
+            for r in ddgs.text(query, max_results=5):
+                title = r.get("title", "")
+                body = r.get("body", "")
+                href = r.get("href", "")
+                results.append(f"Title: {title}\nURL: {href}\nSummary: {body}")
         return "\n\n".join(results) if results else "No live web results found."
     except Exception as exc:
         return "Web Search Error: " + str(exc)[:100]
+
 
 def get_ai_response(history, images=None):
     client = get_client()
@@ -280,6 +299,7 @@ def get_ai_response(history, images=None):
     response = client.chat.completions.create(model=MODEL, messages=api_messages, stream=False)
     return response.choices[0].message.content if response.choices else ""
 
+
 # ============================================================
 # SIDEBAR
 # ============================================================
@@ -287,8 +307,8 @@ def get_ai_response(history, images=None):
 active_chat_data = st.session_state.chats[st.session_state.active_chat]
 
 with st.sidebar:
-    st.markdown(f'<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
-    st.markdown(f'👤 **Guest User / Enterprise Mode**')
+    st.markdown('<div class="nx-title">✦ Nxmini AI</div>', unsafe_allow_html=True)
+    st.markdown("👤 **Guest User / Enterprise Mode**")
 
     st.divider()
     st.markdown(f'<div class="nx-subtitle">{APP_TAGLINE}</div>', unsafe_allow_html=True)
@@ -305,9 +325,14 @@ with st.sidebar:
     st.divider()
 
     st.markdown("### 🛠️ AI Tools Center")
-    
+
     with st.expander("📎 File & Image Upload"):
-        tool_uploads = st.file_uploader("Upload files or images", type=["txt", "py", "md", "png", "jpg", "jpeg", "webp"], accept_multiple_files=True, key="sidebar_file_up")
+        tool_uploads = st.file_uploader(
+            "Upload files or images",
+            type=["txt", "py", "md", "json", "csv", "sql", "xml", "yaml", "yml", "log", "png", "jpg", "jpeg", "webp"],
+            accept_multiple_files=True,
+            key="sidebar_file_up",
+        )
 
     with st.expander("🎙️ Voice Command"):
         tool_audio = st.audio_input("Record audio note", key="sidebar_audio_in")
@@ -329,22 +354,26 @@ with st.sidebar:
                         active_chat_data["messages"].append({"role": "user", "content": f"Generate Image: {gen_box_prompt}"})
                         active_chat_data["messages"].append({"role": "assistant", "content": img_bytes, "type": "image"})
                         st.rerun()
+                    else:
+                        st.warning("Image generation failed. Please try again.")
 
-    with st.expander("🎬 AI Video Generator"):
+    with st.expander("🎬 AI Video / Motion Generator"):
         vid_box_prompt = st.text_input("Describe video scene...", placeholder="e.g., Cinematic drone shot of Dhaka...", key="sidebar_vid_gen_prompt")
-        if st.button("Generate Video", use_container_width=True, key="sidebar_vid_btn"):
+        if st.button("Generate Motion Preview", use_container_width=True, key="sidebar_vid_btn"):
             if vid_box_prompt.strip():
-                with st.spinner("Rendering video animation..."):
+                with st.spinner("Rendering motion preview..."):
                     vid_bytes = generate_ai_video(vid_box_prompt.strip())
                     if vid_bytes:
-                        active_chat_data["messages"].append({"role": "user", "content": f"Generate Video: {vid_box_prompt}"})
+                        active_chat_data["messages"].append({"role": "user", "content": f"Generate Motion Scene: {vid_box_prompt}"})
                         active_chat_data["messages"].append({"role": "assistant", "content": vid_bytes, "type": "video"})
                         st.rerun()
+                    else:
+                        st.warning("Motion preview failed. Please try again.")
 
     with st.expander("🛠️ Custom Image Editor"):
         edit_file_up = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="sidebar_edit_up")
         edit_instruction = st.text_input("How to edit?", placeholder="e.g., make it brighter, blur, or b&w", key="sidebar_edit_instruction")
-        
+
         if edit_file_up and st.button("Apply Edit", use_container_width=True, key="sidebar_edit_btn"):
             edited_bytes = edit_uploaded_image(edit_file_up.getvalue(), edit_instruction)
             if edited_bytes:
@@ -362,9 +391,17 @@ with st.sidebar:
     st.markdown("### Chat History")
     for cid in reversed(list(st.session_state.chats.keys())):
         t = st.session_state.chats[cid]["title"]
-        if st.button("💬 " + t[:25], key="chat_" + cid, use_container_width=True):
-            st.session_state.active_chat = cid
-            st.rerun()
+        col1, col2 = st.columns([0.82, 0.18])
+        with col1:
+            if st.button("💬 " + t[:24], key="chat_" + cid, use_container_width=True):
+                st.session_state.active_chat = cid
+                st.rerun()
+        with col2:
+            if len(st.session_state.chats) > 1 and st.button("✕", key="del_" + cid, help="Delete chat"):
+                del st.session_state.chats[cid]
+                if st.session_state.active_chat == cid:
+                    st.session_state.active_chat = next(iter(st.session_state.chats.keys()))
+                st.rerun()
 
     st.divider()
 
@@ -373,7 +410,13 @@ with st.sidebar:
         for m in active_chat_data["messages"]:
             if isinstance(m.get("content"), str):
                 export_text += f"\n{m['role'].upper()}: {m['content']}\n"
-        st.download_button("📥 Export Chat (.txt)", export_text, file_name=f"nxmini_chat_{int(time.time())}.txt", mime="text/plain", use_container_width=True)
+        st.download_button(
+            "📥 Export Chat (.txt)",
+            export_text,
+            file_name=f"nxmini_chat_{int(time.time())}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
 
     if st.button("🗑️ Clear Active Chat", use_container_width=True):
         active_chat_data["messages"] = []
@@ -390,12 +433,15 @@ messages = chat["messages"]
 st.markdown('<div class="nx-status">✦ NXMINI AI · ENTERPRISE FEATURE SUITE</div>', unsafe_allow_html=True)
 
 if not messages:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="nx-welcome">
         <h1>How can I help you today?</h1>
-        <p>Enterprise ChatGPT Suite: Web Search, Live Weather, Video Generator, Voice, File Analysis, and Image Generation/Editing.</p>
+        <p>Enterprise ChatGPT Suite: Web Search, Live Weather, Motion Generator, Voice, File Analysis, and Image Generation/Editing.</p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 for item in messages:
     avatar = "🧑‍💻" if item["role"] == "user" else "✨"
@@ -403,10 +449,12 @@ for item in messages:
         if item.get("type") == "image":
             st.image(item["content"], caption="Nxmini AI Image Output")
         elif item.get("type") == "video":
-            st.video(item["content"])
-            st.caption("🎬 Nxmini AI Video Output")
+            st.image(item["content"], caption="🎬 Nxmini AI Motion / Scene Output")
         else:
             st.markdown(item["content"])
+            if item.get("attachments"):
+                for img_b in item["attachments"]:
+                    st.image(img_b, caption="Attached Image", width=220)
             if item.get("latency"):
                 st.caption(f"⏱️ Response time: {item['latency']}s")
 
@@ -421,31 +469,41 @@ if user_input and user_input.strip():
     api_prompt = f"[{st.session_state.mode} Mode] " + original_prompt
 
     images_list = []
+    attached_previews = []
     file_notes_list = []
 
-    if 'tool_uploads' in locals() and tool_uploads:
+    if "tool_uploads" in locals() and tool_uploads:
         for u in tool_uploads:
             att = read_attachment(u)
             if att["kind"] == "text":
                 file_notes_list.append(f"\n--- File: {att['name']} ---\n{att['content']}")
             elif att["kind"] == "image":
                 images_list.append(att)
+                attached_previews.append(att["raw_bytes"])
+            elif att["kind"] == "error":
+                st.warning(att["content"])
 
     if file_notes_list:
         api_prompt += "\n" + "\n".join(file_notes_list)
 
     if original_prompt.lower().startswith(("search:", "web:", "find:")):
-        search_term = re.sub(r'^(search:|web:|find:)\s*', '', original_prompt, flags=re.IGNORECASE)
+        search_term = re.sub(r"^(search:|web:|find:)\s*", "", original_prompt, flags=re.IGNORECASE)
         with st.spinner(f"Searching web for: {search_term}..."):
             web_context = search_web(search_term)
             api_prompt += f"\n\nLive Web Search Results:\n{web_context}"
 
-    chat["messages"].append({"role": "user", "content": original_prompt})
+    chat["messages"].append({
+        "role": "user",
+        "content": original_prompt,
+        "attachments": attached_previews,
+    })
     if chat["title"] == "New Chat":
         chat["title"] = original_prompt[:30]
 
     with st.chat_message("user", avatar="🧑‍💻"):
         st.markdown(original_prompt)
+        for img_b in attached_previews:
+            st.image(img_b, caption="Attached Image", width=220)
 
     with st.chat_message("assistant", avatar="✨"):
         try:
@@ -454,7 +512,7 @@ if user_input and user_input.strip():
                 loc = original_prompt.lower()
                 for w in WEATHER_WORDS:
                     loc = loc.replace(w, "")
-                loc = loc.replace("in", "").replace("at", "").replace("for", "").strip()
+                loc = re.sub(r"\b(in|at|for|of|the)\b", " ", loc).strip()
                 if not loc:
                     loc = "Dhaka"
                 ans = get_world_weather(loc)
@@ -463,7 +521,7 @@ if user_input and user_input.strip():
                     api_history = list(chat["messages"])
                     api_history[-1] = {"role": "user", "content": api_prompt}
                     ans = get_ai_response(api_history, images_list)
-            
+
             latency_seconds = round(time.time() - start_time, 2)
             st.markdown(ans)
             st.caption(f"⏱️ Response time: {latency_seconds}s")
@@ -479,8 +537,11 @@ if user_input and user_input.strip():
 # FOOTER
 # ============================================================
 
-st.markdown("""
+st.markdown(
+    """
 <div class="nx-footer">
-    Nxmini AI v3.0 (Enterprise Suite + Sidebar Tools) · <strong>Created by Apan2026</strong>
+    Nxmini AI v3.1 (Enterprise Suite + Sidebar Tools) · <strong>Created by Apan2026</strong>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
